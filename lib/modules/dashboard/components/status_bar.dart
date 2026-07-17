@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class StatusBar extends StatelessWidget {
   final bool isSerialConnected;
@@ -19,123 +20,69 @@ class StatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFF334155), width: 1.0),
-        ),
+        color: AppTheme.card,
+        border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left: App Name and Node Name
-          Row(
-            children: [
-              const Icon(Icons.developer_board, color: Colors.blueAccent, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'LOBSENSE EDGE GATEWAY',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                width: 1,
-                height: 16,
-                color: const Color(0xFF334155),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'NODE: $activeNode',
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          // Logo
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: AppTheme.accent,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: const Icon(Icons.sensors, color: Colors.white, size: 16),
           ),
-          // Right: Connection Status Indicators
-          Row(
-            children: [
-              _buildIndicator(
-                label: 'SERIAL RX',
-                isConnected: isSerialConnected,
-                info: activePort,
-              ),
-              const SizedBox(width: 24),
-              _buildIndicator(
-                label: 'MQTT BROKER',
-                isConnected: isMqttConnected,
-                info: 'MQTT-V2',
-              ),
-              const SizedBox(width: 24),
-              _buildIndicator(
-                label: 'CLOUD API',
-                isConnected: isInternetConnected,
-                info: 'SYNC',
-              ),
-            ],
+          const SizedBox(width: 10),
+          const Text(
+            'Lobsense',
+            style: TextStyle(color: AppTheme.t1, fontWeight: FontWeight.w700, fontSize: 14),
           ),
+          const SizedBox(width: 4),
+          const Text(
+            'Edge Gateway',
+            style: TextStyle(color: AppTheme.t3, fontWeight: FontWeight.w400, fontSize: 14),
+          ),
+
+          const Spacer(),
+
+          // Connection pills
+          _pill('Serial', isSerialConnected, activePort),
+          const SizedBox(width: 6),
+          _pill('MQTT', isMqttConnected, null),
+          const SizedBox(width: 6),
+          _pill('Cloud', isInternetConnected, null),
         ],
       ),
     );
   }
 
-  Widget _buildIndicator({
-    required String label,
-    required bool isConnected,
-    required String info,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Indicator LED dot
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: (isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.4),
-                blurRadius: 4,
-                spreadRadius: 1,
-              ),
-            ],
+  Widget _pill(String label, bool active, String? sub) {
+    final color = active ? AppTheme.ok : AppTheme.t3;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? AppTheme.ok.withValues(alpha: 0.08) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6, height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFFE2E8F0),
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-            Text(
-              isConnected ? info : 'OFFLINE',
-              style: TextStyle(
-                color: isConnected ? const Color(0xFF94A3B8) : const Color(0xFFEF4444).withValues(alpha: 0.8),
-                fontSize: 9,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
-      ],
+          const SizedBox(width: 5),
+          Text(
+            sub != null && active ? '$label · $sub' : label,
+            style: TextStyle(color: active ? AppTheme.ok : AppTheme.t3, fontSize: 10, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 }
