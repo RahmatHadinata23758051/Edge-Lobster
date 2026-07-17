@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
+import '../../../../core/theme/app_theme.dart';
 
 class ConsoleLog {
   final DateTime timestamp;
@@ -36,176 +37,142 @@ class ConsolePanel extends StatefulWidget {
 }
 
 class _ConsolePanelState extends State<ConsolePanel> {
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _sc = ScrollController();
 
   @override
   void didUpdateWidget(ConsolePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Auto scroll ke bawah saat ada log baru masuk
     if (widget.logs.length > oldWidget.logs.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
+        if (_sc.hasClients) {
+          _sc.animateTo(_sc.position.maxScrollExtent, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
         }
       });
     }
   }
 
   @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
+  void dispose() { _sc.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF0B0F19), // Darker terminal background
-        border: Border(
-          top: BorderSide(color: Color(0xFF334155), width: 1.0),
-        ),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header Bar
+          // Header (Light theme)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-            color: const Color(0xFF1E293B),
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+            ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.terminal, size: 14, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'RAW RX DATA STREAM (LORA)',
-                      style: TextStyle(
-                        color: Color(0xFFE2E8F0),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      color: const Color(0xFF0F172A),
-                      child: Text(
-                        '${widget.logs.length} PKTS',
-                        style: const TextStyle(
-                          color: Color(0xFF38BDF8),
-                          fontSize: 8,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ),
-                  ],
+                const Icon(Icons.terminal, size: 12, color: AppTheme.accent),
+                const SizedBox(width: 6),
+                const Text(
+                  'Serial Console',
+                  style: TextStyle(color: AppTheme.t1, fontSize: 11, fontWeight: FontWeight.w600),
                 ),
-                TextButton(
-                  onPressed: widget.onClear,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
-                    'CLEAR CONSOLE',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                  child: Text(
+                    '${widget.logs.length}',
+                    style: const TextStyle(
+                      color: AppTheme.accent,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
                     ),
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: widget.onClear,
+                  child: const Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 12, color: AppTheme.t2),
+                      SizedBox(width: 3),
+                      Text('Clear', style: TextStyle(color: AppTheme.t2, fontSize: 9, fontWeight: FontWeight.w500)),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          
-          // Terminal Output
+          // Body (Light theme log entries)
           Expanded(
             child: widget.logs.isEmpty
                 ? const Center(
-                    child: Text(
-                      'AWAITING SERIAL LORA TRANSMISSION...',
-                      style: TextStyle(
-                        color: Color(0xFF475569),
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: Text('Awaiting LoRa data…', style: TextStyle(color: AppTheme.t3, fontSize: 10)),
                   )
                 : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(8.0),
+                    controller: _sc,
+                    padding: const EdgeInsets.all(8),
                     itemCount: widget.logs.length,
-                    itemBuilder: (context, index) {
-                      final log = widget.logs[index];
+                    itemBuilder: (_, i) {
+                      final log = widget.logs[i];
+                      final badgeColor = log.isValid ? AppTheme.ok : AppTheme.danger;
+
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 6.0),
+                        padding: const EdgeInsets.only(bottom: 6),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Header bar log: timestamp, node, status
                             Row(
                               children: [
                                 Text(
-                                  '[${_formatTime(log.timestamp)}]',
-                                  style: const TextStyle(
-                                    color: Color(0xFF64748B),
-                                    fontFamily: 'monospace',
-                                    fontSize: 9,
-                                  ),
+                                  '[${_fmt(log.timestamp)}]',
+                                  style: const TextStyle(color: AppTheme.t3, fontFamily: 'monospace', fontSize: 9),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Text(
-                                  'NODE: ${log.nodeId}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF38BDF8),
-                                    fontFamily: 'monospace',
-                                    fontSize: 9,
-                                  ),
+                                  log.nodeId,
+                                  style: const TextStyle(color: AppTheme.t2, fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.w600),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-                                  color: log.isValid ? const Color(0xFF064E3B) : const Color(0xFF7F1D1D),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: badgeColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
                                   child: Text(
-                                    log.isValid ? 'VALID' : 'CRC_ERR',
-                                    style: TextStyle(
-                                      color: log.isValid ? const Color(0xFF10B981) : const Color(0xFFF87171),
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    log.isValid ? 'OK' : 'ERR',
+                                    style: TextStyle(color: badgeColor, fontSize: 8, fontWeight: FontWeight.w700),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  log.details,
-                                  style: const TextStyle(
-                                    color: Color(0xFF475569),
-                                    fontSize: 9,
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    log.details,
+                                    style: const TextStyle(color: AppTheme.t3, fontSize: 9),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                            // Hex output
+                            const SizedBox(height: 1),
                             Text(
                               log.hexString,
                               style: TextStyle(
-                                color: log.isValid ? const Color(0xFFCBD5E1) : const Color(0xFFF87171).withValues(alpha: 0.8),
+                                color: log.isValid ? AppTheme.t1 : AppTheme.danger,
                                 fontFamily: 'monospace',
-                                fontSize: 10,
+                                fontSize: 9,
                                 height: 1.3,
-                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
@@ -219,11 +186,5 @@ class _ConsolePanelState extends State<ConsolePanel> {
     );
   }
 
-  String _formatTime(DateTime dt) {
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final min = dt.minute.toString().padLeft(2, '0');
-    final sec = dt.second.toString().padLeft(2, '0');
-    final ms = (dt.millisecond).toString().padLeft(3, '0');
-    return '$hour:$min:$sec.$ms';
-  }
+  String _fmt(DateTime dt) => '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
 }
