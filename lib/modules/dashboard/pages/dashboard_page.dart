@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:math';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../../../core/models/telemetry_data.dart';
-import '../../../../core/services/mock_telemetry_service.dart';
+import '../../../../core/services/serial_port_service.dart';
 import '../../../../core/services/gateway_state_provider.dart';
 import '../components/status_bar.dart';
 import '../components/telemetry_panel.dart';
@@ -19,8 +19,9 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final MockTelemetryService _telemetryService = MockTelemetryService();
-  StreamSubscription<TelemetryData>? _subscription;
+  final SerialPortService _serialService = SerialPortService();
+  StreamSubscription<TelemetryData>? _telemetrySub;
+  StreamSubscription<ConsoleLog>? _consoleSub;
 
   // App States
   TelemetryData? _currentData;
@@ -29,90 +30,78 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    // Gunakan post frame callback untuk memulai generator telemetry
-    // karena membutuhkan parameter dari provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = Provider.of<GatewayStateProvider>(context, listen: false);
       if (state.isSerialConnected) {
-        _startTelemetry(state.activeNodeId);
+        _startSerialConnection(state);
       }
     });
   }
 
-  void _startTelemetry(String nodeId) {
-    _telemetryService.startGenerating(nodeId);
-    _subscription = _telemetryService.telemetryStream.listen((data) {
+  void _startSerialConnection(GatewayStateProvider state) {
+    _stopSerialConnection();
+
+    _telemetrySub = _serialService.telemetryStream.listen((data) {
       if (mounted) {
         setState(() {
           _currentData = data;
-          _addConsoleLogFor(data);
         });
       }
     });
-  }
 
-  void _stopTelemetry() {
-    _subscription?.cancel();
-    _telemetryService.stopGenerating();
-  }
-
-  void _addConsoleLogFor(TelemetryData data) {
-    // Buat biner payload 55-byte palsu berdasarkan data telemetri
-    final bytes = Uint8List(55);
-    final byteData = ByteData.sublistView(bytes);
-
-    // Tulis nilai float (mirip dengan LoraParser)
-    byteData.setFloat32(0, data.temperature, Endian.little);
-    byteData.setFloat32(4, data.ph, Endian.little);
-    byteData.setFloat32(8, data.salinity, Endian.little);
-    byteData.setFloat32(12, data.dissolvedOxygen, Endian.little);
-    byteData.setFloat32(16, data.turbidity, Endian.little);
-    byteData.setFloat32(20, data.flowSpeed, Endian.little);
-    byteData.setFloat32(24, data.solarVoltage, Endian.little);
-    byteData.setFloat32(28, data.solarCurrent, Endian.little);
-    byteData.setFloat32(32, data.batteryVoltage, Endian.little);
-    byteData.setFloat32(36, data.latitude, Endian.little);
-    byteData.setFloat32(40, data.longitude, Endian.little);
-
-    // Sisa byte 44-54 diisi byte padding/checksum
-    final random = Random();
-    for (int i = 44; i < 55; i++) {
-      bytes[i] = random.nextInt(256);
-    }
-
-    final newLog = ConsoleLog(
-      timestamp: DateTime.now(),
-      nodeId: data.serialNumber,
-      rawBytes: bytes,
-      isValid: true,
-      details: 'PARSED OK | RSSI: -84dBm | SNR: 8.5dB',
-    );
-
-    setState(() {
-      _consoleLogs.add(newLog);
-      if (_consoleLogs.length > 100) {
-        _consoleLogs.removeAt(0); // Batasi log maks 100
+    _consoleSub = _serialService.rawConsoleStream.listen((log) {
+      if (mounted) {
+        setState(() {
+          _consoleLogs.add(log);
+          if (_consoleLogs.length > 100) {
+            _consoleLogs.removeAt(0);
+          }
+        });
       }
     });
+
+    final success = _serialService.connect(state.activePort, state.baudRate);
+    if (!success) {
+      state.setSerialConnected(false);
+
+      final failLog = ConsoleLog(
+        timestamp: DateTime.now(),
+        nodeId: 'SYSTEM',
+        rawBytes: Uint8List.fromList(utf8.encode('ERROR: Gagal membuka port ${state.activePort}')),
+        isValid: false,
+        details: 'PORT NOT FOUND OR BUSY | CHECK PHYSICAL CONNECTION',
+      );
+      setState(() {
+        _consoleLogs.add(failLog);
+      });
+    }
+  }
+
+  void _stopSerialConnection() {
+    _telemetrySub?.cancel();
+    _telemetrySub = null;
+    _consoleSub?.cancel();
+    _consoleSub = null;
+    _serialService.disconnect();
   }
 
   @override
   void dispose() {
-    _stopTelemetry();
-    _telemetryService.dispose();
+    _stopSerialConnection();
+    _serialService.dispose();
     super.dispose();
   }
 
-  // Interactive triggers untuk testing koneksi
   void _handleToggleSerial(GatewayStateProvider state) {
-    state.toggleSerial();
-    if (!state.isSerialConnected) {
-      _stopTelemetry();
+    if (state.isSerialConnected) {
+      _stopSerialConnection();
+      state.setSerialConnected(false);
       setState(() {
         _currentData = null;
       });
     } else {
-      _startTelemetry(state.activeNodeId);
+      state.setSerialConnected(true);
+      _startSerialConnection(state);
     }
   }
 
@@ -263,10 +252,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   mqttPassword: mqttPassController.text,
                 );
 
-                // Restart telemetry dengan node ID baru jika serial terkoneksi
                 if (state.isSerialConnected) {
-                  _stopTelemetry();
-                  _startTelemetry(nodeController.text);
+                  _startSerialConnection(state);
                 }
                 Navigator.pop(context);
               },
@@ -327,7 +314,6 @@ class _DashboardPageState extends State<DashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Status Connection Bar (Membaca state real-time dari provider)
             StatusBar(
               isSerialConnected: state.isSerialConnected,
               isMqttConnected: state.isMqttConnected,
@@ -336,7 +322,6 @@ class _DashboardPageState extends State<DashboardPage> {
               activeNode: state.activeNodeId,
             ),
 
-            // Top Action Menu Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
               color: const Color(0xFF1E293B),
@@ -353,7 +338,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   Row(
                     children: [
-                      // Simulators buttons
                       _buildHeaderButton(
                         label: 'TOGGLE SERIAL',
                         onPressed: () => _handleToggleSerial(state),
@@ -387,30 +371,25 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
 
-            // Dashboard Panels Grid Layout (60-40 Split)
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Left panel: Telemetry Values (60% width)
                   Expanded(
                     flex: 6,
                     child: TelemetryPanel(data: _currentData),
                   ),
 
-                  // Vertical divider
                   Container(
                     width: 1,
                     color: const Color(0xFF334155),
                   ),
 
-                  // Right panel: CCTV and Console logs (40% width)
                   Expanded(
                     flex: 4,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Right-Top: CCTV Feed (60% height of column)
                         Expanded(
                           flex: 6,
                           child: VideoPanel(
@@ -419,7 +398,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                         ),
 
-                        // Right-Bottom: RAW Binary Hex Log (40% height of column)
                         Expanded(
                           flex: 4,
                           child: ConsolePanel(
