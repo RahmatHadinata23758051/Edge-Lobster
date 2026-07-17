@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../../../core/models/telemetry_data.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class TelemetryPanel extends StatelessWidget {
   final TelemetryData? data;
@@ -8,324 +10,215 @@ class TelemetryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF0F172A),
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Section: Header
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12.0),
-            child: Text(
-              'LORA SENSOR DATA',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-                letterSpacing: 1.0,
+    const encoder = JsonEncoder.withIndent('  ');
+    final String prettyJson = data != null ? encoder.convert(data!.toJson()) : 'Awaiting incoming LoRa telemetry packet...';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Info bar: node / cage / gps / battery ──
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.card,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              _info('Node', data?.serialNumber ?? '—'),
+              _sep(),
+              _info('Cage', data?.cageCode ?? '—'),
+              _sep(),
+              _info('GPS', data != null ? '${data!.latitude.toStringAsFixed(4)}, ${data!.longitude.toStringAsFixed(4)}' : '—'),
+              _sep(),
+              _info(
+                'Battery',
+                data != null ? '${data!.batteryVoltage}V · ${data!.batteryCurrent}A' : '—',
+                color: _batColor(data?.batteryVoltage),
               ),
-            ),
+            ],
           ),
-          
-          // Grid of Sensors
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.6,
-              children: [
-                _buildSensorTile(
-                  label: 'WATER / AMBIENT TEMP',
-                  value: data != null ? '${data!.temperature} / ${data!.ambientTemperature}' : '--.- / --.-',
-                  unit: '°C',
-                  status: _getTemperatureStatus(data?.temperature),
-                ),
-                _buildSensorTile(
-                  label: 'ACIDITY LEVEL (pH)',
-                  value: data != null ? '${data!.ph}' : '--.-',
-                  unit: 'pH',
-                  status: _getPhStatus(data?.ph),
-                ),
-                _buildSensorTile(
-                  label: 'DISSOLVED OXYGEN (DO)',
-                  value: data != null ? '${data!.dissolvedOxygen}' : '--.-',
-                  unit: 'mg/L',
-                  status: _getDoStatus(data?.dissolvedOxygen),
-                ),
-                _buildSensorTile(
-                  label: 'SALINITY / TDS',
-                  value: data != null ? '${data!.salinity} / ${data!.tds.toStringAsFixed(0)}' : '--.- / ---',
-                  unit: 'ppt/ppm',
-                  status: _getSalinityStatus(data?.salinity),
-                ),
-                _buildSensorTile(
-                  label: 'TURBIDITY (KEKERUHAN)',
-                  value: data != null ? '${data!.turbidity}' : '--.-',
-                  unit: 'NTU',
-                  status: _getTurbidityStatus(data?.turbidity),
-                ),
-                _buildSensorTile(
-                  label: 'WATER FLOW RATE',
-                  value: data != null ? '${data!.flowSpeed}' : '--.-',
-                  unit: 'm/s',
-                  status: _getFlowStatus(data?.flowSpeed),
-                ),
-              ],
-            ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── 6 ultra-compact cards in a 3-column x 2-row grid (fixed height) ──
+        SizedBox(
+          height: 132,
+          child: GridView.count(
+            crossAxisCount: 3,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 2.8,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _tile(Icons.thermostat_outlined, 'Temp', data != null ? '${data!.temperature}/${data!.ambientTemperature}' : '—', '°C', _tempStatus(data?.temperature)),
+              _tile(Icons.science_outlined, 'pH', data != null ? '${data!.ph}' : '—', '', _phStatus(data?.ph)),
+              _tile(Icons.water_drop_outlined, 'DO', data != null ? '${data!.dissolvedOxygen}' : '—', 'mg/L', _doStatus(data?.dissolvedOxygen)),
+              _tile(Icons.water_outlined, 'TDS', data != null ? data!.tds.toStringAsFixed(0) : '—', 'ppm', _tdsStatus(data?.tds)),
+              _tile(Icons.opacity, 'Turbidity', data != null ? '${data!.turbidity}' : '—', 'NTU', _turbStatus(data?.turbidity)),
+              _tile(Icons.waves, 'Flow', data != null ? '${data!.flowSpeed}' : '—', 'm/s', _flowStatus(data?.flowSpeed)),
+            ],
           ),
-          
-          const SizedBox(height: 12),
-          
-          // Section: Power & System Details
-          Container(
-            padding: const EdgeInsets.all(12.0),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Raw JSON Payload Viewer (Takes remaining vertical space) ──
+        Expanded(
+          child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              border: Border.all(color: const Color(0xFF334155), width: 1.0),
+              color: AppTheme.card,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'POWER & SYSTEM METRICS',
-                  style: TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
-                    letterSpacing: 0.8,
+                // JSON panel header
+                Container(
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF1F5F9),
+                    border: Border(bottom: BorderSide(color: AppTheme.border)),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(7)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.code, size: 12, color: AppTheme.accent),
+                      SizedBox(width: 6),
+                      Text(
+                        'Latest JSON Payload (LoRa Parser)',
+                        style: TextStyle(color: AppTheme.t1, fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSystemMetric(
-                      label: 'BATTERY',
-                      value: data != null ? '${data!.batteryVoltage} V / ${data!.batteryCurrent} A' : '--.- V / --.- A',
-                      color: _getBatteryColor(data?.batteryVoltage),
+                // JSON panel code editor-like box
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.border),
                     ),
-                    _buildSystemMetric(
-                      label: 'SOLAR PANEL',
-                      value: data != null ? '${data!.solarVoltage} V / ${data!.solarCurrent} A' : '--.- V / --.- A',
-                      color: data != null && data!.solarVoltage > 5.0 ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        prettyJson,
+                        style: const TextStyle(
+                          color: Color(0xFF334155),
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          height: 1.4,
+                        ),
+                      ),
                     ),
-                    _buildSystemMetric(
-                      label: 'CAGE CODE',
-                      value: data != null ? data!.cageCode : 'CAGE-A01',
-                      color: Colors.blueAccent,
-                    ),
-                    _buildSystemMetric(
-                      label: 'GPS COORDINATES',
-                      value: data != null ? '${data!.latitude}, ${data!.longitude}' : '--.------, --.------',
-                      color: Colors.blueAccent,
-                      isMonospace: true,
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSensorTile({
-    required String label,
-    required String value,
-    required String unit,
-    required _SensorStatus status,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        border: Border.all(
-          color: status.borderColor,
-          width: 1.0,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    color: Color(0xFF94A3B8),
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 1.0),
-                decoration: BoxDecoration(
-                  color: status.bgColor,
-                ),
-                child: Text(
-                  status.text,
-                  style: TextStyle(
-                    color: status.textColor,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'monospace',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                unit,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSystemMetric({
-    required String label,
-    required String value,
-    required Color color,
-    bool isMonospace = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF94A3B8),
-            fontSize: 8,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontFamily: isMonospace ? 'monospace' : null,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
           ),
         ),
       ],
     );
   }
 
-  // Business logic thresholds
-  _SensorStatus _getTemperatureStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value < 25.0 || value > 30.0) return _SensorStatus.critical('WARNING', const Color(0xFFEF4444));
-    return _SensorStatus.normal('NORMAL');
+  Widget _info(String label, String value, {Color? color}) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: AppTheme.t3, fontSize: 8, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 1),
+          Text(
+            value,
+            style: TextStyle(color: color ?? AppTheme.t1, fontSize: 10, fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 
-  _SensorStatus _getPhStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value < 7.5 || value > 8.5) return _SensorStatus.critical('WARNING', const Color(0xFFEF4444));
-    return _SensorStatus.normal('NORMAL');
+  Widget _sep() => Container(width: 1, height: 18, margin: const EdgeInsets.symmetric(horizontal: 8), color: AppTheme.border);
+
+  Widget _tile(IconData icon, String label, String value, String unit, _St st) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // top: icon + label + status dot
+          Row(
+            children: [
+              Icon(icon, size: 12, color: AppTheme.t3),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  style: const TextStyle(color: AppTheme.t2, fontSize: 9, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(color: st.c, shape: BoxShape.circle),
+              ),
+            ],
+          ),
+          // bottom: value + unit
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(color: AppTheme.t1, fontSize: 16, fontWeight: FontWeight.w700, height: 1.1),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (unit.isNotEmpty) ...[
+                const SizedBox(width: 2),
+                Text(
+                  unit,
+                  style: const TextStyle(color: AppTheme.t3, fontSize: 9, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  _SensorStatus _getDoStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value < 5.0) return _SensorStatus.critical('DANGER', const Color(0xFFEF4444));
-    if (value < 6.0) return _SensorStatus.critical('WARNING', const Color(0xFFF59E0B));
-    return _SensorStatus.normal('NORMAL');
-  }
-
-  _SensorStatus _getSalinityStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value < 28.0 || value > 35.0) return _SensorStatus.critical('WARNING', const Color(0xFFEF4444));
-    return _SensorStatus.normal('NORMAL');
-  }
-
-  _SensorStatus _getTurbidityStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value > 15.0) return _SensorStatus.critical('HIGH', const Color(0xFFEF4444));
-    return _SensorStatus.normal('NORMAL');
-  }
-
-  _SensorStatus _getFlowStatus(double? value) {
-    if (value == null) return _SensorStatus.unknown();
-    if (value < 0.1 || value > 0.5) return _SensorStatus.critical('WARNING', const Color(0xFFF59E0B));
-    return _SensorStatus.normal('NORMAL');
-  }
-
-  Color _getBatteryColor(double? value) {
-    if (value == null) return const Color(0xFF64748B);
-    if (value < 11.8) return const Color(0xFFEF4444);
-    if (value < 12.2) return const Color(0xFFF59E0B);
-    return const Color(0xFF10B981);
-  }
+  _St _tempStatus(double? v) => v == null ? _St.na : (v < 25 || v > 30 ? _St.warn : _St.ok);
+  _St _phStatus(double? v) => v == null ? _St.na : (v < 7.5 || v > 8.5 ? _St.warn : _St.ok);
+  _St _doStatus(double? v) => v == null ? _St.na : (v < 5 ? _St.bad : v < 6 ? _St.warn : _St.ok);
+  _St _tdsStatus(double? v) => v == null ? _St.na : (v < 100 || v > 1000 ? _St.warn : _St.ok);
+  _St _turbStatus(double? v) => v == null ? _St.na : (v > 15 ? _St.bad : _St.ok);
+  _St _flowStatus(double? v) => v == null ? _St.na : (v < 0.1 || v > 0.5 ? _St.warn : _St.ok);
+  Color _batColor(double? v) => v == null ? AppTheme.t3 : v < 11.8 ? AppTheme.danger : v < 12.2 ? AppTheme.warn : AppTheme.ok;
 }
 
-class _SensorStatus {
-  final String text;
-  final Color textColor;
-  final Color bgColor;
-  final Color borderColor;
-
-  const _SensorStatus({
-    required this.text,
-    required this.textColor,
-    required this.bgColor,
-    required this.borderColor,
-  });
-
-  factory _SensorStatus.normal(String text) {
-    return _SensorStatus(
-      text: text,
-      textColor: const Color(0xFF10B981),
-      bgColor: const Color(0xFF064E3B),
-      borderColor: const Color(0xFF334155),
-    );
-  }
-
-  factory _SensorStatus.critical(String text, Color color) {
-    return _SensorStatus(
-      text: text,
-      textColor: color,
-      bgColor: color.withValues(alpha: 0.15),
-      borderColor: color.withValues(alpha: 0.5),
-    );
-  }
-
-  factory _SensorStatus.unknown() {
-    return const _SensorStatus(
-      text: 'UNKNOWN',
-      textColor: Color(0xFF64748B),
-      bgColor: Color(0xFF1E293B),
-      borderColor: Color(0xFF334155),
-    );
-  }
+class _St {
+  final String t;
+  final Color c;
+  const _St(this.t, this.c);
+  static const ok = _St('OK', AppTheme.ok);
+  static const warn = _St('WARN', AppTheme.warn);
+  static const bad = _St('BAD', AppTheme.danger);
+  static const na = _St('NA', AppTheme.off);
 }
