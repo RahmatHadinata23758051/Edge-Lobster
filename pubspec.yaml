@@ -45,6 +45,7 @@ dependencies:
   # Hardware-accelerated media kit video player
   media_kit: ^1.1.10
   media_kit_video: ^1.1.10
+  media_kit_libs_windows_video: any
 
   # MQTT client
   mqtt_client: ^10.1.0
