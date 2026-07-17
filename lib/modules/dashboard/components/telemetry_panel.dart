@@ -37,8 +37,8 @@ class TelemetryPanel extends StatelessWidget {
               childAspectRatio: 1.6,
               children: [
                 _buildSensorTile(
-                  label: 'WATER TEMPERATURE',
-                  value: data != null ? '${data!.temperature}' : '--.-',
+                  label: 'WATER / AMBIENT TEMP',
+                  value: data != null ? '${data!.temperature} / ${data!.ambientTemperature}' : '--.- / --.-',
                   unit: '°C',
                   status: _getTemperatureStatus(data?.temperature),
                 ),
@@ -56,8 +56,8 @@ class TelemetryPanel extends StatelessWidget {
                 ),
                 _buildSensorTile(
                   label: 'SALINITY / TDS',
-                  value: data != null ? '${data!.salinity}' : '--.-',
-                  unit: 'ppt',
+                  value: data != null ? '${data!.salinity} / ${data!.tds.toStringAsFixed(0)}' : '--.- / ---',
+                  unit: 'ppt/ppm',
                   status: _getSalinityStatus(data?.salinity),
                 ),
                 _buildSensorTile(
@@ -67,7 +67,7 @@ class TelemetryPanel extends StatelessWidget {
                   status: _getTurbidityStatus(data?.turbidity),
                 ),
                 _buildSensorTile(
-                  label: 'WATER FLOW SPEED',
+                  label: 'WATER FLOW RATE',
                   value: data != null ? '${data!.flowSpeed}' : '--.-',
                   unit: 'm/s',
                   status: _getFlowStatus(data?.flowSpeed),
@@ -103,13 +103,18 @@ class TelemetryPanel extends StatelessWidget {
                   children: [
                     _buildSystemMetric(
                       label: 'BATTERY',
-                      value: data != null ? '${data!.batteryVoltage} V' : '--.- V',
+                      value: data != null ? '${data!.batteryVoltage} V / ${data!.batteryCurrent} A' : '--.- V / --.- A',
                       color: _getBatteryColor(data?.batteryVoltage),
                     ),
                     _buildSystemMetric(
                       label: 'SOLAR PANEL',
                       value: data != null ? '${data!.solarVoltage} V / ${data!.solarCurrent} A' : '--.- V / --.- A',
                       color: data != null && data!.solarVoltage > 5.0 ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                    ),
+                    _buildSystemMetric(
+                      label: 'CAGE CODE',
+                      value: data != null ? data!.cageCode : 'CAGE-A01',
+                      color: Colors.blueAccent,
                     ),
                     _buildSystemMetric(
                       label: 'GPS COORDINATES',
@@ -187,7 +192,7 @@ class TelemetryPanel extends StatelessWidget {
                 style: const TextStyle(
                   color: Colors.white,
                   fontFamily: 'monospace',
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -196,7 +201,7 @@ class TelemetryPanel extends StatelessWidget {
                 unit,
                 style: const TextStyle(
                   color: Color(0xFF64748B),
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -238,7 +243,7 @@ class TelemetryPanel extends StatelessWidget {
     );
   }
 
-  // Business logic thresholds (avoiding hardcoded magic numbers)
+  // Business logic thresholds
   _SensorStatus _getTemperatureStatus(double? value) {
     if (value == null) return _SensorStatus.unknown();
     if (value < 25.0 || value > 30.0) return _SensorStatus.critical('WARNING', const Color(0xFFEF4444));
@@ -266,7 +271,7 @@ class TelemetryPanel extends StatelessWidget {
 
   _SensorStatus _getTurbidityStatus(double? value) {
     if (value == null) return _SensorStatus.unknown();
-    if (value > 10.0) return _SensorStatus.critical('HIGH', const Color(0xFFEF4444));
+    if (value > 15.0) return _SensorStatus.critical('HIGH', const Color(0xFFEF4444));
     return _SensorStatus.normal('NORMAL');
   }
 
@@ -310,8 +315,8 @@ class _SensorStatus {
     return _SensorStatus(
       text: text,
       textColor: color,
-      bgColor: color.withOpacity(0.15),
-      borderColor: color.withOpacity(0.5),
+      bgColor: color.withValues(alpha: 0.15),
+      borderColor: color.withValues(alpha: 0.5),
     );
   }
 
