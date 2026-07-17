@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/models/telemetry_data.dart';
 import '../../../../core/services/serial_port_service.dart';
 import '../../../../core/services/gateway_state_provider.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../components/status_bar.dart';
 import '../components/telemetry_panel.dart';
 import '../components/video_panel.dart';
@@ -23,7 +24,6 @@ class _DashboardPageState extends State<DashboardPage> {
   StreamSubscription<TelemetryData>? _telemetrySub;
   StreamSubscription<ConsoleLog>? _consoleSub;
 
-  // App States
   TelemetryData? _currentData;
   final List<ConsoleLog> _consoleLogs = [];
 
@@ -31,24 +31,16 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final state = Provider.of<GatewayStateProvider>(context, listen: false);
-      if (state.isSerialConnected) {
-        _startSerialConnection(state);
-      }
+      final s = Provider.of<GatewayStateProvider>(context, listen: false);
+      if (s.isSerialConnected) _startSerial(s);
     });
   }
 
-  void _startSerialConnection(GatewayStateProvider state) {
-    _stopSerialConnection();
-
-    _telemetrySub = _serialService.telemetryStream.listen((data) {
-      if (mounted) {
-        setState(() {
-          _currentData = data;
-        });
-      }
+  void _startSerial(GatewayStateProvider s) {
+    _stopSerial();
+    _telemetrySub = _serialService.telemetryStream.listen((d) {
+      if (mounted) setState(() => _currentData = d);
     });
-
     _consoleSub = _serialService.rawConsoleStream.listen((log) {
       if (mounted) {
         setState(() {
@@ -59,444 +51,129 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     });
-
-    final success = _serialService.connect(state.activePort, state.baudRate);
-    if (!success) {
-      state.setSerialConnected(false);
-
-      final failLog = ConsoleLog(
-        timestamp: DateTime.now(),
-        nodeId: 'SYSTEM',
-        rawBytes: Uint8List.fromList(utf8.encode('ERROR: Gagal membuka port ${state.activePort}')),
-        isValid: false,
-        details: 'PORT NOT FOUND OR BUSY | CHECK PHYSICAL CONNECTION',
-      );
+    final ok = _serialService.connect(s.activePort, s.baudRate);
+    if (!ok) {
+      s.setSerialConnected(false);
       setState(() {
-        _consoleLogs.add(failLog);
+        _consoleLogs.add(ConsoleLog(
+          timestamp: DateTime.now(), nodeId: 'SYSTEM',
+          rawBytes: Uint8List.fromList(utf8.encode('ERROR: Port ${s.activePort} not available')),
+          isValid: false, details: 'PORT NOT FOUND',
+        ));
       });
     }
   }
 
-  void _stopSerialConnection() {
-    _telemetrySub?.cancel();
-    _telemetrySub = null;
-    _consoleSub?.cancel();
-    _consoleSub = null;
+  void _stopSerial() {
+    _telemetrySub?.cancel(); _telemetrySub = null;
+    _consoleSub?.cancel(); _consoleSub = null;
     _serialService.disconnect();
   }
 
   @override
-  void dispose() {
-    _stopSerialConnection();
-    _serialService.dispose();
-    super.dispose();
-  }
+  void dispose() { _stopSerial(); _serialService.dispose(); super.dispose(); }
 
-  void _handleToggleSerial(GatewayStateProvider state) {
-    if (state.isSerialConnected) {
-      _stopSerialConnection();
-      state.setSerialConnected(false);
-      setState(() {
-        _currentData = null;
-      });
+  void _toggleSerial(GatewayStateProvider s) {
+    if (s.isSerialConnected) {
+      _stopSerial(); s.setSerialConnected(false);
+      setState(() => _currentData = null);
     } else {
-      state.setSerialConnected(true);
-      _startSerialConnection(state);
+      s.setSerialConnected(true); _startSerial(s);
     }
   }
 
-  void _showSettingsDialog(GatewayStateProvider state) {
-    String selectedPort = state.activePort;
-    int selectedBaud = state.baudRate;
+  @override
+  Widget build(BuildContext context) {
+    final s = Provider.of<GatewayStateProvider>(context);
 
-    final nodeController = TextEditingController(text: state.activeNodeId);
-    final rtspController = TextEditingController(text: state.rtspUrl);
-    final mqttHostController = TextEditingController(text: state.mqttHost);
-    final mqttPortController = TextEditingController(text: state.mqttPort.toString());
-    final mqttUserController = TextEditingController(text: state.mqttUsername);
-    final mqttPassController = TextEditingController(text: state.mqttPassword);
+    return Scaffold(
+      backgroundColor: AppTheme.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header ──
+            StatusBar(
+              isSerialConnected: s.isSerialConnected,
+              isMqttConnected: s.isMqttConnected,
+              isInternetConnected: s.isInternetConnected,
+              activePort: s.activePort,
+              activeNode: s.activeNodeId,
+            ),
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        // Ambil daftar port aktif
-        final List<String> availablePorts = List.from(SerialPortService.getAvailablePorts());
-        if (!availablePorts.contains(selectedPort)) {
-          availablePorts.add(selectedPort);
-        }
-
-        final List<int> standardBauds = [4800, 9600, 19200, 38400, 57600, 115200];
-        if (!standardBauds.contains(selectedBaud)) {
-          standardBauds.add(selectedBaud);
-          standardBauds.sort();
-        }
-
-        return StatefulBuilder(
-          builder: (context, dialogSetState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF0F172A),
-              shape: const BeveledRectangleBorder(
-                side: BorderSide(color: Color(0xFF334155), width: 1.0),
-              ),
-              title: Container(
-                padding: const EdgeInsets.only(bottom: 8),
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Color(0xFF334155), width: 1.0),
-                  ),
-                ),
-                child: const Row(
+            // ── Body ──
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(Icons.tune, color: Colors.blueAccent, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'EDGE GATEWAY SYSTEM SETTINGS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                    // Left Column: Telemetry (flex-expanded)
+                    Expanded(
+                      child: TelemetryPanel(data: _currentData),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // Right Column: Camera + Console (width constrained)
+                    SizedBox(
+                      width: 400,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // CCTV aspect ratio 16:9
+                          AspectRatio(
+                            aspectRatio: 16 / 9,
+                            child: VideoPanel(rtspUrl: s.rtspUrl, cameraName: 'CCTV-TAMBAK-01'),
+                          ),
+                          const SizedBox(height: 10),
+                          // Serial Console
+                          Expanded(
+                            child: ConsolePanel(
+                              logs: _consoleLogs,
+                              onClear: () => setState(() => _consoleLogs.clear()),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              content: SizedBox(
-                width: 550,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // --- SERIAL CONFIG SECTION ---
-                      const Text(
-                        '// SERIAL PORT RECEIVER CONFIGURATION',
-                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDropdownField<String>(
-                              label: 'PORT SELECTION',
-                              value: selectedPort,
-                              items: availablePorts.map((port) {
-                                return DropdownMenuItem<String>(
-                                  value: port,
-                                  child: Text(port, style: const TextStyle(fontSize: 11)),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  dialogSetState(() {
-                                    selectedPort = val;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildDropdownField<int>(
-                              label: 'BAUD RATE',
-                              value: selectedBaud,
-                              items: standardBauds.map((baud) {
-                                return DropdownMenuItem<int>(
-                                  value: baud,
-                                  child: Text('$baud bps', style: const TextStyle(fontSize: 11)),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  dialogSetState(() {
-                                    selectedBaud = val;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // --- MQTT BROKER SECTION ---
-                      const Text(
-                        '// MQTT BROKER CONFIGURATION (CLOUD TRANSMISSION)',
-                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: _buildTextField(label: 'BROKER HOST', controller: mqttHostController),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 1,
-                            child: _buildTextField(label: 'PORT', controller: mqttPortController),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(label: 'USERNAME', controller: mqttUserController),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildTextField(label: 'PASSWORD', controller: mqttPassController, isObscure: true),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // --- CCTV & NODE CONFIG SECTION ---
-                      const Text(
-                        '// NODE MONITORING & LIVE CCTV FEED CONFIGURATION',
-                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(label: 'MONITORED NODE ID', controller: nodeController),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildTextField(label: 'LOCAL CCTV RTSP URL', controller: rtspController),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF94A3B8),
-                    side: const BorderSide(color: Color(0xFF334155)),
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                  ),
-                  child: const Text('CANCEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    final mqttPortValue = int.tryParse(mqttPortController.text) ?? 1883;
-
-                    state.updateSettings(
-                      activePort: selectedPort,
-                      baudRate: selectedBaud,
-                      activeNodeId: nodeController.text,
-                      rtspUrl: rtspController.text,
-                      mqttHost: mqttHostController.text,
-                      mqttPort: mqttPortValue,
-                      mqttUsername: mqttUserController.text,
-                      mqttPassword: mqttPassController.text,
-                    );
-
-                    if (state.isSerialConnected) {
-                      _startSerialConnection(state);
-                    }
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    foregroundColor: Colors.white,
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                  ),
-                  child: const Text('SAVE & APPLY CONFIG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildDropdownField<T>({
-    required String label,
-    required T value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 4),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          items: items,
-          onChanged: onChanged,
-          dropdownColor: const Color(0xFF0F172A),
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            filled: true,
-            fillColor: Color(0xFF0F172A),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFF334155), width: 1.0),
-              borderRadius: BorderRadius.zero,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.blueAccent, width: 1.0),
-              borderRadius: BorderRadius.zero,
-            ),
-            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTextField({
-    required String label,
-    required TextEditingController controller,
-    bool isObscure = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          obscureText: isObscure,
-          style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
-          decoration: const InputDecoration(
-            filled: true,
-            fillColor: Color(0xFF0F172A),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color(0xFF334155), width: 1.0),
-              borderRadius: BorderRadius.zero,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.blueAccent, width: 1.0),
-              borderRadius: BorderRadius.zero,
-            ),
-            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = Provider.of<GatewayStateProvider>(context);
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        child: Column(
-          children: [
-            StatusBar(
-              isSerialConnected: state.isSerialConnected,
-              isMqttConnected: state.isMqttConnected,
-              isInternetConnected: state.isInternetConnected,
-              activePort: state.activePort,
-              activeNode: state.activeNodeId,
             ),
 
+            // ── Footer ──
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-              color: const Color(0xFF1E293B),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'CONTROL PANEL GATEWAY',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      _buildHeaderButton(
-                        label: 'TOGGLE SERIAL',
-                        onPressed: () => _handleToggleSerial(state),
-                        color: state.isSerialConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildHeaderButton(
-                        label: 'TOGGLE MQTT',
-                        onPressed: state.toggleMqtt,
-                        color: state.isMqttConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildHeaderButton(
-                        label: 'TOGGLE API SYNC',
-                        onPressed: state.toggleInternet,
-                        color: state.isInternetConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(width: 1, height: 16, color: const Color(0xFF334155)),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        onPressed: () => _showSettingsDialog(state),
-                        icon: const Icon(Icons.settings, color: Colors.white, size: 16),
-                        tooltip: 'Configure Gateway Settings',
-                        constraints: const BoxConstraints(),
-                        padding: EdgeInsets.zero,
-                      ),
-                    ],
-                  ),
-                ],
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: const BoxDecoration(
+                color: AppTheme.card,
+                border: Border(top: BorderSide(color: AppTheme.border)),
               ),
-            ),
-
-            Expanded(
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    flex: 6,
-                    child: TelemetryPanel(data: _currentData),
+                  const Icon(Icons.access_time, size: 12, color: AppTheme.t3),
+                  const SizedBox(width: 4),
+                  Text(
+                    _currentData != null
+                        ? 'Last update: ${_fmt(_currentData!.timestamp)}'
+                        : 'Waiting for data…',
+                    style: const TextStyle(color: AppTheme.t3, fontSize: 10),
                   ),
-
-                  Container(
-                    width: 1,
-                    color: const Color(0xFF334155),
-                  ),
-
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 6,
-                          child: VideoPanel(
-                            rtspUrl: state.rtspUrl,
-                            cameraName: 'CCTV-TAMBAK-01',
-                          ),
-                        ),
-
-                        Expanded(
-                          flex: 4,
-                          child: ConsolePanel(
-                            logs: _consoleLogs,
-                            onClear: () {
-                              setState(() {
-                                _consoleLogs.clear();
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+                  const Spacer(),
+                  _actionBtn(Icons.usb, 'Serial', s.isSerialConnected, () => _toggleSerial(s)),
+                  const SizedBox(width: 6),
+                  _actionBtn(Icons.cloud_sync, 'MQTT', s.isMqttConnected, s.toggleMqtt),
+                  const SizedBox(width: 6),
+                  _actionBtn(Icons.language, 'API', s.isInternetConnected, s.toggleInternet),
+                  const SizedBox(width: 12),
+                  Container(width: 1, height: 20, color: AppTheme.border),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => _showSettings(s),
+                    icon: const Icon(Icons.settings_outlined, size: 16, color: AppTheme.t2),
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                    tooltip: 'Settings',
                   ),
                 ],
               ),
@@ -507,25 +184,159 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildHeaderButton({
-    required String label,
-    required VoidCallback onPressed,
-    required Color color,
-  }) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: color, width: 1.0),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+  Widget _actionBtn(IconData icon, String label, bool on, VoidCallback tap) {
+    return GestureDetector(
+      onTap: tap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: on ? AppTheme.accent : AppTheme.bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: on ? AppTheme.accent : AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: on ? Colors.white : AppTheme.t3),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(color: on ? Colors.white : AppTheme.t3, fontSize: 9, fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }
+
+  // ── Settings Dialog ──
+  void _showSettings(GatewayStateProvider s) {
+    String port = s.activePort;
+    int baud = s.baudRate;
+    final node = TextEditingController(text: s.activeNodeId);
+    final rtsp = TextEditingController(text: s.rtspUrl);
+    final mHost = TextEditingController(text: s.mqttHost);
+    final mPort = TextEditingController(text: s.mqttPort.toString());
+    final mUser = TextEditingController(text: s.mqttUsername);
+    final mPass = TextEditingController(text: s.mqttPassword);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final ports = List<String>.from(SerialPortService.getAvailablePorts());
+        if (!ports.contains(port)) ports.add(port);
+        final bauds = [4800, 9600, 19200, 38400, 57600, 115200];
+        if (!bauds.contains(baud)) { bauds.add(baud); bauds.sort(); }
+
+        return StatefulBuilder(builder: (ctx, dss) {
+          return AlertDialog(
+            title: Row(children: [
+              const Icon(Icons.tune, size: 16, color: AppTheme.accent),
+              const SizedBox(width: 8),
+              const Text('Gateway Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.t1)),
+            ]),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectLabel('Serial Port'),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(child: _dd<String>('Port', port, ports.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 12)))).toList(), (v) { if (v != null) dss(() => port = v); })),
+                      const SizedBox(width: 8),
+                      Expanded(child: _dd<int>('Baud', baud, bauds.map((b) => DropdownMenuItem(value: b, child: Text('$b', style: const TextStyle(fontSize: 12)))).toList(), (v) { if (v != null) dss(() => baud = v); })),
+                    ]),
+                    const SizedBox(height: 16),
+                    _sectLabel('MQTT Broker'),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(flex: 3, child: _tf('Host', mHost)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _tf('Port', mPort)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(child: _tf('User', mUser)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _tf('Password', mPass, obscure: true)),
+                    ]),
+                    const SizedBox(height: 16),
+                    _sectLabel('Node & CCTV'),
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(child: _tf('Node ID', node)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _tf('RTSP URL', rtsp)),
+                    ]),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: AppTheme.t3))),
+              ElevatedButton(
+                onPressed: () {
+                  s.updateSettings(
+                    activePort: port, baudRate: baud,
+                    activeNodeId: node.text, rtspUrl: rtsp.text,
+                    mqttHost: mHost.text, mqttPort: int.tryParse(mPort.text) ?? 1883,
+                    mqttUsername: mUser.text, mqttPassword: mPass.text,
+                  );
+                  if (s.isSerialConnected) _startSerial(s);
+                  Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                child: const Text('Save', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  Widget _sectLabel(String t) => Text(t, style: const TextStyle(color: AppTheme.accent, fontSize: 10, fontWeight: FontWeight.w700));
+
+  Widget _dd<T>(String label, T value, List<DropdownMenuItem<T>> items, ValueChanged<T?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppTheme.t3, fontSize: 9, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 3),
+        DropdownButtonFormField<T>(
+          initialValue: value, items: items, onChanged: onChanged,
+          dropdownColor: AppTheme.card,
+          style: const TextStyle(color: AppTheme.t1, fontSize: 12),
+          decoration: InputDecoration(
+            filled: true, fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.border), borderRadius: BorderRadius.circular(8)),
+            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.accent), borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _tf(String label, TextEditingController c, {bool obscure = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppTheme.t3, fontSize: 9, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 3),
+        TextField(
+          controller: c, obscureText: obscure,
+          style: const TextStyle(color: AppTheme.t1, fontSize: 12),
+          decoration: InputDecoration(
+            filled: true, fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.border), borderRadius: BorderRadius.circular(8)),
+            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.accent), borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _fmt(DateTime d) => '${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}:${d.second.toString().padLeft(2,'0')}';
 }
