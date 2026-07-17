@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math';
+import 'package:provider/provider.dart';
 import '../../../../core/models/telemetry_data.dart';
 import '../../../../core/services/mock_telemetry_service.dart';
+import '../../../../core/services/gateway_state_provider.dart';
 import '../components/status_bar.dart';
 import '../components/telemetry_panel.dart';
 import '../components/video_panel.dart';
@@ -23,25 +25,22 @@ class _DashboardPageState extends State<DashboardPage> {
   // App States
   TelemetryData? _currentData;
   final List<ConsoleLog> _consoleLogs = [];
-  
-  // Connection states for status indicators
-  bool _isSerialConnected = true;
-  bool _isMqttConnected = true;
-  bool _isInternetConnected = true;
-
-  // Configurations
-  String _activePort = 'COM3';
-  String _activeNode = 'DEMO-NODE-001';
-  String _rtspUrl = 'rtsp://192.168.100.50:554/stream1';
 
   @override
   void initState() {
     super.initState();
-    _startTelemetry();
+    // Gunakan post frame callback untuk memulai generator telemetry
+    // karena membutuhkan parameter dari provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = Provider.of<GatewayStateProvider>(context, listen: false);
+      if (state.isSerialConnected) {
+        _startTelemetry(state.activeNodeId);
+      }
+    });
   }
 
-  void _startTelemetry() {
-    _telemetryService.startGenerating(_activeNode);
+  void _startTelemetry(String nodeId) {
+    _telemetryService.startGenerating(nodeId);
     _subscription = _telemetryService.telemetryStream.listen((data) {
       if (mounted) {
         setState(() {
@@ -104,35 +103,23 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  // Interative trigger untuk testing koneksi
-  void _toggleSerial() {
-    setState(() {
-      _isSerialConnected = !_isSerialConnected;
-      if (!_isSerialConnected) {
-        _stopTelemetry();
+  // Interactive triggers untuk testing koneksi
+  void _handleToggleSerial(GatewayStateProvider state) {
+    state.toggleSerial();
+    if (!state.isSerialConnected) {
+      _stopTelemetry();
+      setState(() {
         _currentData = null;
-      } else {
-        _startTelemetry();
-      }
-    });
+      });
+    } else {
+      _startTelemetry(state.activeNodeId);
+    }
   }
 
-  void _toggleMqtt() {
-    setState(() {
-      _isMqttConnected = !_isMqttConnected;
-    });
-  }
-
-  void _toggleInternet() {
-    setState(() {
-      _isInternetConnected = !_isInternetConnected;
-    });
-  }
-
-  void _showSettingsDialog() {
-    final portController = TextEditingController(text: _activePort);
-    final nodeController = TextEditingController(text: _activeNode);
-    final rtspController = TextEditingController(text: _rtspUrl);
+  void _showSettingsDialog(GatewayStateProvider state) {
+    final portController = TextEditingController(text: state.activePort);
+    final nodeController = TextEditingController(text: state.activeNodeId);
+    final rtspController = TextEditingController(text: state.rtspUrl);
 
     showDialog(
       context: context,
@@ -168,14 +155,17 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  _activePort = portController.text;
-                  _activeNode = nodeController.text;
-                  _rtspUrl = rtspController.text;
-                  // Restart telemetry dengan serial baru
+                state.updateSettings(
+                  activePort: portController.text,
+                  activeNodeId: nodeController.text,
+                  rtspUrl: rtspController.text,
+                );
+                
+                // Restart telemetry dengan node ID baru jika serial terkoneksi
+                if (state.isSerialConnected) {
                   _stopTelemetry();
-                  _startTelemetry();
-                });
+                  _startTelemetry(nodeController.text);
+                }
                 Navigator.pop(context);
               },
               child: const Text('SAVE SETTINGS', style: TextStyle(color: Colors.blueAccent)),
@@ -221,18 +211,20 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final state = Provider.of<GatewayStateProvider>(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
         child: Column(
           children: [
-            // Status Connection Bar
+            // Status Connection Bar (Membaca state real-time dari provider)
             StatusBar(
-              isSerialConnected: _isSerialConnected,
-              isMqttConnected: _isMqttConnected,
-              isInternetConnected: _isInternetConnected,
-              activePort: _activePort,
-              activeNode: _activeNode,
+              isSerialConnected: state.isSerialConnected,
+              isMqttConnected: state.isMqttConnected,
+              isInternetConnected: state.isInternetConnected,
+              activePort: state.activePort,
+              activeNode: state.activeNodeId,
             ),
 
             // Top Action Menu Bar
@@ -255,26 +247,26 @@ class _DashboardPageState extends State<DashboardPage> {
                       // Simulators buttons
                       _buildHeaderButton(
                         label: 'TOGGLE SERIAL',
-                        onPressed: _toggleSerial,
-                        color: _isSerialConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                        onPressed: () => _handleToggleSerial(state),
+                        color: state.isSerialConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
                       ),
                       const SizedBox(width: 8),
                       _buildHeaderButton(
                         label: 'TOGGLE MQTT',
-                        onPressed: _toggleMqtt,
-                        color: _isMqttConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                        onPressed: state.toggleMqtt,
+                        color: state.isMqttConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
                       ),
                       const SizedBox(width: 8),
                       _buildHeaderButton(
                         label: 'TOGGLE API SYNC',
-                        onPressed: _toggleInternet,
-                        color: _isInternetConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                        onPressed: state.toggleInternet,
+                        color: state.isInternetConnected ? const Color(0xFF10B981) : const Color(0xFF64748B),
                       ),
                       const SizedBox(width: 16),
                       Container(width: 1, height: 16, color: const Color(0xFF334155)),
                       const SizedBox(width: 16),
                       IconButton(
-                        onPressed: _showSettingsDialog,
+                        onPressed: () => _showSettingsDialog(state),
                         icon: const Icon(Icons.settings, color: Colors.white, size: 16),
                         tooltip: 'Configure Gateway Settings',
                         constraints: const BoxConstraints(),
@@ -313,7 +305,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         Expanded(
                           flex: 6,
                           child: VideoPanel(
-                            rtspUrl: _rtspUrl,
+                            rtspUrl: state.rtspUrl,
                             cameraName: 'CCTV-TAMBAK-01',
                           ),
                         ),
