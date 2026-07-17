@@ -32,7 +32,7 @@ class StatusBar extends StatelessWidget {
           Container(
             width: 28, height: 28,
             decoration: BoxDecoration(
-              color: AppTheme.accent,
+              color: AppTheme.accentGreen,
               borderRadius: BorderRadius.circular(7),
             ),
             child: const Icon(Icons.sensors, color: Colors.white, size: 16),

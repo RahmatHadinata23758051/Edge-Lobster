@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -18,17 +17,11 @@ class _VideoPanelState extends State<VideoPanel> {
   Player? _player;
   VideoController? _controller;
   bool _hasError = false;
-  String _errorMessage = '';
-  DateTime _now = DateTime.now();
-  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _initPlayer();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
-    });
   }
 
   void _initPlayer() {
@@ -38,7 +31,7 @@ class _VideoPanelState extends State<VideoPanel> {
       setState(() { _player = p; _controller = c; _hasError = false; });
       p.open(Media(widget.rtspUrl));
     } catch (e) {
-      setState(() { _hasError = true; _errorMessage = 'libmpv not available'; });
+      setState(() { _hasError = true; });
     }
   }
 
@@ -53,14 +46,14 @@ class _VideoPanelState extends State<VideoPanel> {
   }
 
   @override
-  void dispose() { _timer?.cancel(); _player?.dispose(); super.dispose(); }
+  void dispose() { _player?.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFF090C10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.border),
       ),
       clipBehavior: Clip.antiAlias,
@@ -72,65 +65,83 @@ class _VideoPanelState extends State<VideoPanel> {
           else
             _fallback(),
 
-          // OSD top-left
+          // Live indicator top center
           Positioned(
-            top: 8, left: 8,
-            child: _osd(Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 5, height: 5, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                const SizedBox(width: 5),
-                Text('REC ${widget.cameraName}', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600, fontFamily: 'monospace')),
-              ],
-            )),
-          ),
-
-          // OSD top-right
-          Positioned(
-            top: 8, right: 8,
-            child: _osd(Text(_ts(_now), style: const TextStyle(color: Colors.white, fontSize: 9, fontFamily: 'monospace', fontWeight: FontWeight.w600))),
-          ),
-
-          // OSD bottom-left
-          Positioned(
-            bottom: 8, left: 8,
-            child: _osd(Text(
-              _hasError ? 'FALLBACK' : 'RTSP LIVE',
-              style: TextStyle(color: _hasError ? AppTheme.danger : AppTheme.ok, fontSize: 8, fontFamily: 'monospace', fontWeight: FontWeight.w700),
-            )),
+            top: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _osd(Widget child) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-    child: child,
-  );
-
   Widget _fallback() {
     return Container(
-      color: const Color(0xFF020617),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.videocam_off_outlined, color: Color(0xFF334155), size: 28),
-            const SizedBox(height: 8),
-            const Text('Live Camera Feed', style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 3),
-            Text(widget.rtspUrl, style: const TextStyle(color: Color(0xFF475569), fontFamily: 'monospace', fontSize: 9)),
-            if (_errorMessage.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(_errorMessage, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 9)),
+      color: const Color(0xFF090D16),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Subtle grid lines matching reference screenshot grid
+          Opacity(
+            opacity: 0.04,
+            child: GridPaper(
+              color: Colors.greenAccent,
+              interval: 32,
+              subdivisions: 1,
+            ),
+          ),
+          // Fallback UI
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.videocam_outlined, color: Color(0xFF30363D), size: 36),
+              const SizedBox(height: 12),
+              Text(
+                'KAMERA - Menunggu feed'.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF8B949E),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-
-  String _ts(DateTime d) => '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')} ${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}:${d.second.toString().padLeft(2,'0')}';
 }

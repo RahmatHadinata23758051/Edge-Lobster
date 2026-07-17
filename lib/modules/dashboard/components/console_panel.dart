@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
+import 'dart:convert';
 import '../../../../core/theme/app_theme.dart';
 
 class ConsoleLog {
@@ -19,6 +20,14 @@ class ConsoleLog {
 
   String get hexString {
     return rawBytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+  }
+
+  String get utf8String {
+    try {
+      return utf8.decode(rawBytes);
+    } catch (_) {
+      return '';
+    }
   }
 }
 
@@ -58,121 +67,117 @@ class _ConsolePanelState extends State<ConsolePanel> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.border),
+        color: AppTheme.terminalBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF30363D)),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header (Light theme)
+          // Header (Visual Tab Style matching screenshot exactly)
           Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: const BoxDecoration(
-              color: Color(0xFFF1F5F9),
-              border: Border(bottom: BorderSide(color: AppTheme.border)),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+              color: Color(0xFF161B22),
+              border: Border(bottom: BorderSide(color: Color(0xFF30363D))),
             ),
             child: Row(
               children: [
-                const Icon(Icons.terminal, size: 12, color: AppTheme.accent),
-                const SizedBox(width: 6),
-                const Text(
-                  'Serial Console',
-                  style: TextStyle(color: AppTheme.t1, fontSize: 11, fontWeight: FontWeight.w600),
+                // Window Control dots (gray)
+                const Row(
+                  children: [
+                    Text('● ● ●', style: TextStyle(color: Color(0xFF484F58), fontSize: 10, letterSpacing: 1.0)),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${widget.logs.length}',
-                    style: const TextStyle(
-                      color: AppTheme.accent,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                    ),
+                const SizedBox(width: 16),
+                // Tab title
+                const Text(
+                  'raw_data_lora.json',
+                  style: TextStyle(
+                    color: Color(0xFF8B949E),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'monospace',
                   ),
                 ),
                 const Spacer(),
-                GestureDetector(
-                  onTap: widget.onClear,
-                  child: const Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 12, color: AppTheme.t2),
-                      SizedBox(width: 3),
-                      Text('Clear', style: TextStyle(color: AppTheme.t2, fontSize: 9, fontWeight: FontWeight.w500)),
-                    ],
+                // Blinking/Active status dot
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF238636), // Green
+                    shape: BoxShape.circle,
                   ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'menerima paket',
+                  style: TextStyle(
+                    color: Color(0xFF8B949E),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Clear button
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 14, color: Color(0xFF8B949E)),
+                  onPressed: widget.onClear,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Hapus Log',
                 ),
               ],
             ),
           ),
-          // Body (Light theme log entries)
+          // Body (Beautiful highlighted logs)
           Expanded(
             child: widget.logs.isEmpty
                 ? const Center(
-                    child: Text('Awaiting LoRa data…', style: TextStyle(color: AppTheme.t3, fontSize: 10)),
+                    child: Text(
+                      'Awaiting telemetry streams...',
+                      style: TextStyle(color: Color(0xFF484F58), fontSize: 11, fontFamily: 'monospace'),
+                    ),
                   )
                 : ListView.builder(
                     controller: _sc,
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     itemCount: widget.logs.length,
                     itemBuilder: (_, i) {
                       final log = widget.logs[i];
-                      final badgeColor = log.isValid ? AppTheme.ok : AppTheme.danger;
+                      final lineNum = (i + 1).toString().padLeft(2, '0');
+                      final jsonText = log.utf8String;
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Column(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '[${_fmt(log.timestamp)}]',
-                                  style: const TextStyle(color: AppTheme.t3, fontFamily: 'monospace', fontSize: 9),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  log.nodeId,
-                                  style: const TextStyle(color: AppTheme.t2, fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: badgeColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: Text(
-                                    log.isValid ? 'OK' : 'ERR',
-                                    style: TextStyle(color: badgeColor, fontSize: 8, fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    log.details,
-                                    style: const TextStyle(color: AppTheme.t3, fontSize: 9),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 1),
+                            // Line number (e.g. 01)
                             Text(
-                              log.hexString,
-                              style: TextStyle(
-                                color: log.isValid ? AppTheme.t1 : AppTheme.danger,
+                              lineNum,
+                              style: const TextStyle(
+                                color: Color(0xFF484F58),
                                 fontFamily: 'monospace',
-                                fontSize: 9,
-                                height: 1.3,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // Styled JSON content
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 10,
+                                    height: 1.3,
+                                  ),
+                                  children: _highlightJson(jsonText),
+                                ),
                               ),
                             ),
                           ],
@@ -186,5 +191,74 @@ class _ConsolePanelState extends State<ConsolePanel> {
     );
   }
 
-  String _fmt(DateTime dt) => '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
+  /// Simple JSON Highlighter
+  List<TextSpan> _highlightJson(String text) {
+    if (text.isEmpty) return [const TextSpan(text: '')];
+
+    final List<TextSpan> spans = [];
+    final RegExp regExp = RegExp(
+      r'("[^"]*")\s*(:)\s*|("[^"]*")|(\b[0-9.-]+\b)|(\b(true|false|null)\b)|([\{\}\[\],:])',
+      multiLine: true,
+    );
+
+    int lastMatchEnd = 0;
+
+    for (final Match match in regExp.allMatches(text)) {
+      // Add text before the match
+      if (match.start > lastMatchEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastMatchEnd, match.start),
+          style: const TextStyle(color: Color(0xFFC9D1D9)),
+        ));
+      }
+
+      if (match.group(1) != null) {
+        // Match key: "key":
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: const TextStyle(color: Color(0xFF79C0FF)), // Light Blue
+        ));
+        spans.add(TextSpan(
+          text: match.group(2) ?? ':',
+          style: const TextStyle(color: Color(0xFFC9D1D9)),
+        ));
+      } else if (match.group(3) != null) {
+        // Match string value: "value"
+        spans.add(TextSpan(
+          text: match.group(3),
+          style: const TextStyle(color: Color(0xFFA5D6FF)), // Greenish Blue
+        ));
+      } else if (match.group(4) != null) {
+        // Match number value
+        spans.add(TextSpan(
+          text: match.group(4),
+          style: const TextStyle(color: Color(0xFFFF9485)), // Light orange
+        ));
+      } else if (match.group(5) != null) {
+        // Match boolean/null
+        spans.add(TextSpan(
+          text: match.group(5),
+          style: const TextStyle(color: Color(0xFFFF7B72)), // Orange red
+        ));
+      } else if (match.group(7) != null) {
+        // Match bracket / separator
+        spans.add(TextSpan(
+          text: match.group(7),
+          style: const TextStyle(color: Color(0xFFC9D1D9)),
+        ));
+      }
+
+      lastMatchEnd = match.end;
+    }
+
+    // Add trailing text
+    if (lastMatchEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastMatchEnd),
+        style: const TextStyle(color: Color(0xFFC9D1D9)),
+      ));
+    }
+
+    return spans;
+  }
 }
