@@ -104,7 +104,7 @@ class StatusBar extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.4),
+                color: (isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.4),
                 blurRadius: 4,
                 spreadRadius: 1,
               ),
@@ -128,7 +128,7 @@ class StatusBar extends StatelessWidget {
             Text(
               isConnected ? info : 'OFFLINE',
               style: TextStyle(
-                color: isConnected ? const Color(0xFF94A3B8) : const Color(0xFFEF4444).withOpacity(0.8),
+                color: isConnected ? const Color(0xFF94A3B8) : const Color(0xFFEF4444).withValues(alpha: 0.8),
                 fontSize: 9,
                 fontFamily: 'monospace',
               ),

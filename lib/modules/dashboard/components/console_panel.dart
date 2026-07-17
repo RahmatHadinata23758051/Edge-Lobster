@@ -201,7 +201,7 @@ class _ConsolePanelState extends State<ConsolePanel> {
                             Text(
                               log.hexString,
                               style: TextStyle(
-                                color: log.isValid ? const Color(0xFFCBD5E1) : const Color(0xFFF87171).withOpacity(0.8),
+                                color: log.isValid ? const Color(0xFFCBD5E1) : const Color(0xFFF87171).withValues(alpha: 0.8),
                                 fontFamily: 'monospace',
                                 fontSize: 10,
                                 height: 1.3,

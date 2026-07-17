@@ -112,7 +112,7 @@ class _VideoPanelState extends State<VideoPanel> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: Colors.black.withValues(alpha: 0.75),
                 border: Border.all(color: const Color(0xFF334155), width: 1.0),
               ),
               child: Row(
@@ -147,7 +147,7 @@ class _VideoPanelState extends State<VideoPanel> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.75),
+                color: Colors.black.withValues(alpha: 0.75),
                 border: Border.all(color: const Color(0xFF334155), width: 1.0),
               ),
               child: Text(
@@ -168,7 +168,7 @@ class _VideoPanelState extends State<VideoPanel> {
             left: 12,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              color: Colors.black.withOpacity(0.75),
+              color: Colors.black.withValues(alpha: 0.75),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -259,7 +259,7 @@ class _VideoPanelState extends State<VideoPanel> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E293B),
-                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3), width: 1.0),
+                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3), width: 1.0),
                   ),
                   child: Text(
                     _errorMessage,
