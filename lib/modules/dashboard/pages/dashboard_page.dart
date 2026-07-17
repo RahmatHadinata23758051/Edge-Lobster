@@ -106,8 +106,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showSettingsDialog(GatewayStateProvider state) {
-    final portController = TextEditingController(text: state.activePort);
-    final baudController = TextEditingController(text: state.baudRate.toString());
+    String selectedPort = state.activePort;
+    int selectedBaud = state.baudRate;
+
     final nodeController = TextEditingController(text: state.activeNodeId);
     final rtspController = TextEditingController(text: state.rtspUrl);
     final mqttHostController = TextEditingController(text: state.mqttHost);
@@ -118,155 +119,240 @@ class _DashboardPageState extends State<DashboardPage> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF0F172A),
-          shape: const BeveledRectangleBorder(
-            side: BorderSide(color: Color(0xFF334155), width: 1.0),
-          ),
-          title: Container(
-            padding: const EdgeInsets.only(bottom: 8),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Color(0xFF334155), width: 1.0),
+        // Ambil daftar port aktif
+        final List<String> availablePorts = List.from(SerialPortService.getAvailablePorts());
+        if (!availablePorts.contains(selectedPort)) {
+          availablePorts.add(selectedPort);
+        }
+
+        final List<int> standardBauds = [4800, 9600, 19200, 38400, 57600, 115200];
+        if (!standardBauds.contains(selectedBaud)) {
+          standardBauds.add(selectedBaud);
+          standardBauds.sort();
+        }
+
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              shape: const BeveledRectangleBorder(
+                side: BorderSide(color: Color(0xFF334155), width: 1.0),
               ),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.tune, color: Colors.blueAccent, size: 18),
-                SizedBox(width: 8),
-                Text(
-                  'EDGE GATEWAY SYSTEM SETTINGS',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
+              title: Container(
+                padding: const EdgeInsets.only(bottom: 8),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFF334155), width: 1.0),
                   ),
                 ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.tune, color: Colors.blueAccent, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'EDGE GATEWAY SYSTEM SETTINGS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              content: SizedBox(
+                width: 550,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // --- SERIAL CONFIG SECTION ---
+                      const Text(
+                        '// SERIAL PORT RECEIVER CONFIGURATION',
+                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDropdownField<String>(
+                              label: 'PORT SELECTION',
+                              value: selectedPort,
+                              items: availablePorts.map((port) {
+                                return DropdownMenuItem<String>(
+                                  value: port,
+                                  child: Text(port, style: const TextStyle(fontSize: 11)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  dialogSetState(() {
+                                    selectedPort = val;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildDropdownField<int>(
+                              label: 'BAUD RATE',
+                              value: selectedBaud,
+                              items: standardBauds.map((baud) {
+                                return DropdownMenuItem<int>(
+                                  value: baud,
+                                  child: Text('$baud bps', style: const TextStyle(fontSize: 11)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  dialogSetState(() {
+                                    selectedBaud = val;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // --- MQTT BROKER SECTION ---
+                      const Text(
+                        '// MQTT BROKER CONFIGURATION (CLOUD TRANSMISSION)',
+                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: _buildTextField(label: 'BROKER HOST', controller: mqttHostController),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 1,
+                            child: _buildTextField(label: 'PORT', controller: mqttPortController),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(label: 'USERNAME', controller: mqttUserController),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildTextField(label: 'PASSWORD', controller: mqttPassController, isObscure: true),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // --- CCTV & NODE CONFIG SECTION ---
+                      const Text(
+                        '// NODE MONITORING & LIVE CCTV FEED CONFIGURATION',
+                        style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(label: 'MONITORED NODE ID', controller: nodeController),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildTextField(label: 'LOCAL CCTV RTSP URL', controller: rtspController),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF94A3B8),
+                    side: const BorderSide(color: Color(0xFF334155)),
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text('CANCEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final mqttPortValue = int.tryParse(mqttPortController.text) ?? 1883;
+
+                    state.updateSettings(
+                      activePort: selectedPort,
+                      baudRate: selectedBaud,
+                      activeNodeId: nodeController.text,
+                      rtspUrl: rtspController.text,
+                      mqttHost: mqttHostController.text,
+                      mqttPort: mqttPortValue,
+                      mqttUsername: mqttUserController.text,
+                      mqttPassword: mqttPassController.text,
+                    );
+
+                    if (state.isSerialConnected) {
+                      _startSerialConnection(state);
+                    }
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    foregroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text('SAVE & APPLY CONFIG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
               ],
-            ),
-          ),
-          content: SizedBox(
-            width: 550,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- SERIAL CONFIG SECTION ---
-                  const Text(
-                    '// SERIAL PORT RECEIVER CONFIGURATION',
-                    style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(label: 'PORT (e.g. COM3 / ttyUSB0)', controller: portController),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildTextField(label: 'BAUD RATE', controller: baudController),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // --- MQTT BROKER SECTION ---
-                  const Text(
-                    '// MQTT BROKER CONFIGURATION (CLOUD TRANSMISSION)',
-                    style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _buildTextField(label: 'BROKER HOST', controller: mqttHostController),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 1,
-                        child: _buildTextField(label: 'PORT', controller: mqttPortController),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(label: 'USERNAME', controller: mqttUserController),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildTextField(label: 'PASSWORD', controller: mqttPassController, isObscure: true),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // --- CCTV & NODE CONFIG SECTION ---
-                  const Text(
-                    '// NODE MONITORING & LIVE CCTV FEED CONFIGURATION',
-                    style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(label: 'MONITORED NODE ID', controller: nodeController),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildTextField(label: 'LOCAL CCTV RTSP URL', controller: rtspController),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF94A3B8),
-                side: const BorderSide(color: Color(0xFF334155)),
-                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text('CANCEL', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final baudValue = int.tryParse(baudController.text) ?? 9600;
-                final mqttPortValue = int.tryParse(mqttPortController.text) ?? 1883;
-
-                state.updateSettings(
-                  activePort: portController.text,
-                  baudRate: baudValue,
-                  activeNodeId: nodeController.text,
-                  rtspUrl: rtspController.text,
-                  mqttHost: mqttHostController.text,
-                  mqttPort: mqttPortValue,
-                  mqttUsername: mqttUserController.text,
-                  mqttPassword: mqttPassController.text,
-                );
-
-                if (state.isSerialConnected) {
-                  _startSerialConnection(state);
-                }
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text('SAVE & APPLY CONFIG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            ),
-          ],
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _buildDropdownField<T>({
+    required String label,
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        ),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          items: items,
+          onChanged: onChanged,
+          dropdownColor: const Color(0xFF0F172A),
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
+          decoration: const InputDecoration(
+            filled: true,
+            fillColor: Color(0xFF0F172A),
+            enabledBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF334155), width: 1.0),
+              borderRadius: BorderRadius.zero,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.blueAccent, width: 1.0),
+              borderRadius: BorderRadius.zero,
+            ),
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          ),
+        ),
+      ],
     );
   }
 
