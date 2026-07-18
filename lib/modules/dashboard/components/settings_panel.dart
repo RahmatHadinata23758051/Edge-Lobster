@@ -66,188 +66,235 @@ class _SettingsPanelState extends State<SettingsPanel> {
       standardBauds.sort();
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Title
-          const Text(
-            'Pengaturan Gateway',
-            style: TextStyle(color: AppTheme.t1, fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Konfigurasi port serial, broker MQTT, serta koneksi integrasi API.',
-            style: TextStyle(color: AppTheme.t3, fontSize: 11),
-          ),
-          const SizedBox(height: 20),
-          const Divider(color: AppTheme.border, height: 1),
-          const SizedBox(height: 20),
-
-          // Scrollable fields
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ─── Header (Matching Dashboard Layout) ───
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Pengaturan Gateway',
+                  style: TextStyle(color: AppTheme.t1, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Konfigurasi port serial, broker MQTT, serta koneksi integrasi API',
+                  style: TextStyle(color: AppTheme.t3, fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Connection Toggles
-                  _sectTitle(Icons.online_prediction, 'Koneksi & Status Aktif'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _connectionButton(
-                        icon: Icons.usb,
-                        label: 'Serial Port',
-                        active: widget.state.isSerialConnected,
-                        onPressed: widget.onToggleSerial,
-                      ),
-                      const SizedBox(width: 12),
-                      _connectionButton(
-                        icon: Icons.cloud_sync,
-                        label: 'MQTT Broker',
-                        active: widget.state.isMqttConnected,
-                        onPressed: widget.state.toggleMqtt,
-                      ),
-                      const SizedBox(width: 12),
-                      _connectionButton(
-                        icon: Icons.language,
-                        label: 'API Cloud Sync',
-                        active: widget.state.isInternetConnected,
-                        onPressed: widget.state.toggleInternet,
-                      ),
-                    ],
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentGreen,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Serial Config
-                  _sectTitle(Icons.usb, 'Serial Port Config'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _dropdownField<String>(
-                          label: 'Pilihan Port',
-                          value: _port,
-                          items: availablePorts.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 12)))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _port = val);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _dropdownField<int>(
-                          label: 'Baud Rate',
-                          value: _baud,
-                          items: standardBauds.map((b) => DropdownMenuItem(value: b, child: Text('$b bps', style: const TextStyle(fontSize: 12)))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setState(() => _baud = val);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // MQTT Config
-                  _sectTitle(Icons.cloud_sync, 'MQTT Broker Config'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: _textField(label: 'Host Broker', controller: _mqttHostController),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: 1,
-                        child: _textField(label: 'Port', controller: _mqttPortController),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _textField(label: 'Username', controller: _mqttUserController),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _textField(label: 'Password', controller: _mqttPassController, obscure: true),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Node & CCTV Config
-                  _sectTitle(Icons.sensors, 'Node & CCTV Camera'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _textField(label: 'Monitored Node ID', controller: _nodeController),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _textField(label: 'RTSP CCTV URL', controller: _rtspController),
-                      ),
-                    ],
+                  SizedBox(width: 6),
+                  Text(
+                    'Sistem Siap',
+                    style: TextStyle(
+                      color: AppTheme.deepGreen,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+          ],
+        ),
 
-          // Actions
-          const SizedBox(height: 16),
-          const Divider(color: AppTheme.border, height: 1),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  final mqttPortValue = int.tryParse(_mqttPortController.text) ?? 1883;
+        const SizedBox(height: 16),
 
-                  widget.state.updateSettings(
-                    activePort: _port,
-                    baudRate: _baud,
-                    activeNodeId: _nodeController.text,
-                    rtspUrl: _rtspController.text,
-                    mqttHost: _mqttHostController.text,
-                    mqttPort: mqttPortValue,
-                    mqttUsername: _mqttUserController.text,
-                    mqttPassword: _mqttPassController.text,
-                  );
+        // ─── Main Form Container Card ───
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Connection Toggles
+                        _sectTitle(Icons.online_prediction, 'KONEKSI & STATUS AKTIF'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _connectionButton(
+                              icon: Icons.usb,
+                              label: 'Serial Port',
+                              active: widget.state.isSerialConnected,
+                              onPressed: widget.onToggleSerial,
+                            ),
+                            const SizedBox(width: 12),
+                            _connectionButton(
+                              icon: Icons.cloud_sync,
+                              label: 'MQTT Broker',
+                              active: widget.state.isMqttConnected,
+                              onPressed: widget.state.toggleMqtt,
+                            ),
+                            const SizedBox(width: 12),
+                            _connectionButton(
+                              icon: Icons.language,
+                              label: 'API Cloud Sync',
+                              active: widget.state.isInternetConnected,
+                              onPressed: widget.state.toggleInternet,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pengaturan berhasil disimpan & diterapkan.'),
-                      backgroundColor: AppTheme.accentGreen,
-                      duration: Duration(seconds: 2),
+                        // Serial Config
+                        _sectTitle(Icons.usb, 'SERIAL PORT CONFIG'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _dropdownField<String>(
+                                label: 'Pilihan Port',
+                                value: _port,
+                                items: availablePorts.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 12)))).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _port = val);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _dropdownField<int>(
+                                label: 'Baud Rate',
+                                value: _baud,
+                                items: standardBauds.map((b) => DropdownMenuItem(value: b, child: Text('$b bps', style: const TextStyle(fontSize: 12)))).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _baud = val);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // MQTT Config
+                        _sectTitle(Icons.cloud_sync, 'MQTT BROKER CONFIG'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _textField(label: 'Host Broker', controller: _mqttHostController),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 1,
+                              child: _textField(label: 'Port', controller: _mqttPortController),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _textField(label: 'Username', controller: _mqttUserController),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _textField(label: 'Password', controller: _mqttPassController, obscure: true),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Node & CCTV Config
+                        _sectTitle(Icons.sensors, 'NODE & CCTV CAMERA'),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _textField(label: 'Monitored Node ID', controller: _nodeController),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _textField(label: 'RTSP CCTV URL', controller: _rtspController),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  );
-
-                  widget.onSaved();
-                },
-                icon: const Icon(Icons.check, size: 16, color: Colors.white),
-                label: const Text('Simpan Perubahan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.deepGreen,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-            ],
+
+                // Actions Footer
+                const SizedBox(height: 16),
+                const Divider(color: AppTheme.border, height: 1),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        final mqttPortValue = int.tryParse(_mqttPortController.text) ?? 1883;
+
+                        widget.state.updateSettings(
+                          activePort: _port,
+                          baudRate: _baud,
+                          activeNodeId: _nodeController.text,
+                          rtspUrl: _rtspController.text,
+                          mqttHost: _mqttHostController.text,
+                          mqttPort: mqttPortValue,
+                          mqttUsername: _mqttUserController.text,
+                          mqttPassword: _mqttPassController.text,
+                        );
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Pengaturan berhasil disimpan & diterapkan.'),
+                            backgroundColor: AppTheme.primaryGreen,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+
+                        widget.onSaved();
+                      },
+                      icon: const Icon(Icons.check, size: 16, color: Colors.white),
+                      label: const Text('Simpan Perubahan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -270,8 +317,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
           ),
         ),
         style: OutlinedButton.styleFrom(
-          backgroundColor: active ? AppTheme.accentGreen : Colors.transparent,
-          side: BorderSide(color: active ? AppTheme.accentGreen : AppTheme.border),
+          backgroundColor: active ? AppTheme.primaryGreen : Colors.transparent,
+          side: BorderSide(color: active ? AppTheme.primaryGreen : AppTheme.border),
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -285,12 +332,12 @@ class _SettingsPanelState extends State<SettingsPanel> {
         Icon(icon, size: 14, color: AppTheme.primaryGreen),
         const SizedBox(width: 6),
         Text(
-          text.toUpperCase(),
+          text,
           style: const TextStyle(
             color: AppTheme.primaryGreen,
             fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.0,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
           ),
         ),
       ],
@@ -316,7 +363,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
           style: const TextStyle(color: AppTheme.t1, fontSize: 12),
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF9FAFB),
+            fillColor: AppTheme.bg,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             enabledBorder: OutlineInputBorder(
               borderSide: const BorderSide(color: AppTheme.border),
@@ -348,7 +395,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
           style: const TextStyle(color: AppTheme.t1, fontSize: 12),
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF9FAFB),
+            fillColor: AppTheme.bg,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             enabledBorder: OutlineInputBorder(
               borderSide: const BorderSide(color: AppTheme.border),
