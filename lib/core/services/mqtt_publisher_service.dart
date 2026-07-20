@@ -171,10 +171,10 @@ class MqttPublisherService {
     });
   }
 
-  /// Publish structured TelemetryData object as JSON payload to topic `lobsense/telemetry/{nodeId}`.
+  /// Publish structured TelemetryData object as JSON payload to topic `lobsense/telemetry`.
   Future<bool> publishTelemetry(TelemetryData data, {String? topicOverride}) async {
     final String payloadJson = jsonEncode(data.toJson());
-    final String topic = topicOverride ?? 'lobsense/telemetry/${data.nodeId}';
+    final String topic = topicOverride ?? 'lobsense/telemetry';
     return publishString(payloadJson, topic: topic);
   }
 

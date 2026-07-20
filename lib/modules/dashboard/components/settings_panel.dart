@@ -47,6 +47,24 @@ class _SettingsPanelState extends State<SettingsPanel> {
     _mqttPassController = TextEditingController(text: widget.state.mqttPassword);
   }
 
+  @override
+  void didUpdateWidget(covariant SettingsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.state.isInitialized && widget.state.isInitialized) {
+      setState(() {
+        _port = widget.state.activePort;
+        _baud = widget.state.baudRate;
+        _refreshAvailablePorts();
+        _nodeController.text = widget.state.activeNodeId;
+        _rtspController.text = widget.state.rtspUrl;
+        _mqttHostController.text = widget.state.mqttHost;
+        _mqttPortController.text = widget.state.mqttPort.toString();
+        _mqttUserController.text = widget.state.mqttUsername;
+        _mqttPassController.text = widget.state.mqttPassword;
+      });
+    }
+  }
+
   void _refreshAvailablePorts() {
     final ports = List<String>.from(SerialPortService.getAvailablePorts());
     if (!ports.contains(_port)) {
