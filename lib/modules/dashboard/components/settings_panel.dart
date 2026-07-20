@@ -35,34 +35,35 @@ class _SettingsPanelState extends State<SettingsPanel> {
   @override
   void initState() {
     super.initState();
-    _port = widget.state.activePort;
-    _baud = widget.state.baudRate;
-    _refreshAvailablePorts();
+    _nodeController = TextEditingController();
+    _rtspController = TextEditingController();
+    _mqttHostController = TextEditingController();
+    _mqttPortController = TextEditingController();
+    _mqttUserController = TextEditingController();
+    _mqttPassController = TextEditingController();
 
-    _nodeController = TextEditingController(text: widget.state.activeNodeId);
-    _rtspController = TextEditingController(text: widget.state.rtspUrl);
-    _mqttHostController = TextEditingController(text: widget.state.mqttHost);
-    _mqttPortController = TextEditingController(text: widget.state.mqttPort.toString());
-    _mqttUserController = TextEditingController(text: widget.state.mqttUsername);
-    _mqttPassController = TextEditingController(text: widget.state.mqttPassword);
+    _syncFromState();
+    widget.state.addListener(_onStateChanged);
   }
 
-  @override
-  void didUpdateWidget(covariant SettingsPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (!oldWidget.state.isInitialized && widget.state.isInitialized) {
-      setState(() {
-        _port = widget.state.activePort;
-        _baud = widget.state.baudRate;
-        _refreshAvailablePorts();
-        _nodeController.text = widget.state.activeNodeId;
-        _rtspController.text = widget.state.rtspUrl;
-        _mqttHostController.text = widget.state.mqttHost;
-        _mqttPortController.text = widget.state.mqttPort.toString();
-        _mqttUserController.text = widget.state.mqttUsername;
-        _mqttPassController.text = widget.state.mqttPassword;
-      });
+  void _onStateChanged() {
+    if (mounted) {
+      _syncFromState();
     }
+  }
+
+  void _syncFromState() {
+    setState(() {
+      _port = widget.state.activePort;
+      _baud = widget.state.baudRate;
+      _refreshAvailablePorts();
+      _nodeController.text = widget.state.activeNodeId;
+      _rtspController.text = widget.state.rtspUrl;
+      _mqttHostController.text = widget.state.mqttHost;
+      _mqttPortController.text = widget.state.mqttPort.toString();
+      _mqttUserController.text = widget.state.mqttUsername;
+      _mqttPassController.text = widget.state.mqttPassword;
+    });
   }
 
   void _refreshAvailablePorts() {
@@ -75,6 +76,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   @override
   void dispose() {
+    widget.state.removeListener(_onStateChanged);
     _nodeController.dispose();
     _rtspController.dispose();
     _mqttHostController.dispose();

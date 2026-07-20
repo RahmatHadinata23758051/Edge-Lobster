@@ -9,16 +9,16 @@ class GatewayStateProvider extends ChangeNotifier {
   bool _isInternetConnected = true;
 
   // Active configurations with default values
-  String _activePort = 'COM3';
-  int _baudRate = 9600;
+  String _activePort = 'COM10';
+  int _baudRate = 115200;
   
-  String _activeNodeId = 'DEMO-NODE-001';
+  String _activeNodeId = 'AQ-01';
   String _rtspUrl = 'rtsp://192.168.100.50:554/stream1';
 
-  String _mqttHost = '192.168.1.100';
+  String _mqttHost = 'app.lobsens-unpad.web.id';
   int _mqttPort = 1883;
-  String _mqttUsername = 'edge_gateway';
-  String _mqttPassword = 'edge_secret';
+  String _mqttUsername = 'lobsense_mqtt';
+  String _mqttPassword = '';
 
   bool _isInitialized = false;
 
