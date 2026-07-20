@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'serial_port_service.dart';
 
 class GatewayStateProvider extends ChangeNotifier {
   // Connection states
@@ -24,12 +25,12 @@ class GatewayStateProvider extends ChangeNotifier {
   GatewayStateProvider() {
     _loadSettings();
   }
-
+  
   // Getters
   bool get isSerialConnected => _isSerialConnected;
   bool get isMqttConnected => _isMqttConnected;
   bool get isInternetConnected => _isInternetConnected;
-  
+
   String get activePort => _activePort;
   int get baudRate => _baudRate;
   
@@ -47,14 +48,22 @@ class GatewayStateProvider extends ChangeNotifier {
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _activePort = prefs.getString('activePort') ?? 'COM3';
-      _baudRate = prefs.getInt('baudRate') ?? 9600;
-      _activeNodeId = prefs.getString('activeNodeId') ?? 'DEMO-NODE-001';
+      
+      // Auto-detect available COM ports if default COM10 is not present
+      final availablePorts = SerialPortService.getAvailablePorts();
+      String defaultPort = 'COM10';
+      if (availablePorts.isNotEmpty) {
+        defaultPort = availablePorts.contains('COM10') ? 'COM10' : availablePorts.first;
+      }
+
+      _activePort = prefs.getString('activePort') ?? defaultPort;
+      _baudRate = prefs.getInt('baudRate') ?? 115200;
+      _activeNodeId = prefs.getString('activeNodeId') ?? 'AQ-01';
       _rtspUrl = prefs.getString('rtspUrl') ?? 'rtsp://192.168.100.50:554/stream1';
-      _mqttHost = prefs.getString('mqttHost') ?? '192.168.1.100';
+      _mqttHost = prefs.getString('mqttHost') ?? '103.67.78.91';
       _mqttPort = prefs.getInt('mqttPort') ?? 1883;
-      _mqttUsername = prefs.getString('mqttUsername') ?? 'edge_gateway';
-      _mqttPassword = prefs.getString('mqttPassword') ?? 'edge_secret';
+      _mqttUsername = prefs.getString('mqttUsername') ?? 'lobsense_mqtt';
+      _mqttPassword = prefs.getString('mqttPassword') ?? '';
       _isInitialized = true;
       notifyListeners();
     } catch (e) {
