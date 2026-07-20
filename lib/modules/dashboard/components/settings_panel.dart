@@ -96,19 +96,19 @@ class _SettingsPanelState extends State<SettingsPanel> {
                 color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     width: 5,
                     height: 5,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: AppTheme.accentGreen,
                       shape: BoxShape.circle,
                     ),
                   ),
-                  SizedBox(width: 6),
-                  Text(
+                  const SizedBox(width: 6),
+                  const Text(
                     'Sistem Siap',
                     style: TextStyle(
                       color: AppTheme.deepGreen,

@@ -17,6 +17,8 @@ class TelemetryData {
   final double longitude;
   final DateTime timestamp;
 
+  String get nodeId => serialNumber;
+
   TelemetryData({
     required this.serialNumber,
     required this.cageCode,
