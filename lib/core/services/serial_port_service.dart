@@ -12,8 +12,8 @@ class SerialPortService {
   SerialPortReader? _reader;
   StreamSubscription<Uint8List>? _subscription;
 
-  final _streamController = StreamController<TelemetryData>.broadcast();
-  final _rawConsoleController = StreamController<ConsoleLog>.broadcast();
+  final StreamController<TelemetryData> _streamController = StreamController<TelemetryData>.broadcast();
+  final StreamController<ConsoleLog> _rawConsoleController = StreamController<ConsoleLog>.broadcast();
 
   // Buffer to accumulate data from serial port chunks
   final StringBuffer _rxBuffer = StringBuffer();
@@ -23,9 +23,14 @@ class SerialPortService {
 
   bool get isOpen => _port != null && _port!.isOpen;
 
-  // Mendapatkan daftar port serial yang tersedia di sistem
+  /// Mendapatkan daftar port serial yang tersedia di sistem
   static List<String> getAvailablePorts() {
-    return SerialPort.availablePorts;
+    try {
+      return SerialPort.availablePorts;
+    } catch (e) {
+      debugPrint('Gagal mengambil daftar availablePorts: $e');
+      return [];
+    }
   }
 
   /// Memulai koneksi ke port serial dan mendengarkan data masuk
@@ -35,8 +40,8 @@ class SerialPortService {
     try {
       debugPrint('Menghubungkan ke Port Serial: $portAddress dengan Baud Rate: $baudRate');
       
-      // Validasi apakah port terdaftar di sistem
-      if (!SerialPort.availablePorts.contains(portAddress)) {
+      final available = getAvailablePorts();
+      if (!available.contains(portAddress)) {
         debugPrint('Port serial $portAddress tidak terdeteksi di sistem.');
         return false;
       }
@@ -45,7 +50,10 @@ class SerialPortService {
 
       if (!port.openReadWrite()) {
         final err = SerialPort.lastError;
-        debugPrint('Gagal membuka port serial: $err');
+        debugPrint('Gagal membuka port serial $portAddress: $err');
+        try {
+          port.dispose();
+        } catch (_) {}
         return false;
       }
 
@@ -57,7 +65,7 @@ class SerialPortService {
         ..stopBits = 1;
       config.setFlowControl(SerialPortFlowControl.none);
       port.config = config;
-      config.dispose(); // Bebaskan native memory
+      config.dispose(); // Bebaskan native config memory
 
       _port = port;
       _reader = SerialPortReader(port);
@@ -67,7 +75,7 @@ class SerialPortService {
           _handleIncomingData(data);
         },
         onError: (error) {
-          debugPrint('Eror pada stream serial port: $error');
+          debugPrint('Error pada stream serial port: $error');
           disconnect();
         },
         onDone: () {
@@ -78,42 +86,46 @@ class SerialPortService {
 
       return true;
     } catch (e) {
-      debugPrint('Eror saat menghubungkan serial: $e');
+      debugPrint('Error saat menghubungkan serial: $e');
       disconnect();
       return false;
     }
   }
 
-  /// Memutuskan koneksi port serial dan membersihkan resource
+  /// Memutuskan koneksi port serial dan membersihkan resource secara aman (mencegah C FFI double-free)
   void disconnect() {
     try {
       _subscription?.cancel();
       _subscription = null;
 
-      _reader?.close();
-      _reader = null;
-
-      if (_port != null) {
-        if (_port!.isOpen) {
-          _port!.close();
-        }
-        _port!.dispose();
+      if (_reader != null) {
+        // SerialPortReader.close() mengurus penutupan & pembebasan native handle port secara internal
+        try {
+          _reader!.close();
+        } catch (_) {}
+        _reader = null;
+        _port = null;
+      } else if (_port != null) {
+        try {
+          if (_port!.isOpen) {
+            _port!.close();
+          }
+          _port!.dispose();
+        } catch (_) {}
         _port = null;
       }
       debugPrint('Koneksi Serial diputus.');
     } catch (e) {
-      debugPrint('Eror saat memutuskan koneksi serial: $e');
+      debugPrint('Error saat memutuskan koneksi serial: $e');
     }
   }
 
   /// Menangani data masuk dan merakit baris data biner / JSON
   void _handleIncomingData(Uint8List rawBytes) {
     try {
-      // Decode bytes ke string ascii/utf8 secara aman
       final part = utf8.decode(rawBytes, allowMalformed: true);
       _rxBuffer.write(part);
 
-      // Cari baris baru (newline delimiter) yang menandakan akhir satu frame JSON
       String bufferContent = _rxBuffer.toString();
       while (bufferContent.contains('\n')) {
         final index = bufferContent.indexOf('\n');
@@ -136,15 +148,12 @@ class SerialPortService {
   void _processLine(String line) {
     final bytes = Uint8List.fromList(utf8.encode(line));
     try {
-      // Coba parse menggunakan LoraParser
       final telemetry = LoraParser.parse(bytes);
 
-      // Emit ke data stream telemetri utama
       if (!_streamController.isClosed) {
         _streamController.add(telemetry);
       }
 
-      // Emit log konsol sukses
       _emitConsoleLog(
         nodeId: telemetry.serialNumber,
         rawBytes: bytes,
@@ -153,7 +162,6 @@ class SerialPortService {
       );
     } catch (e) {
       debugPrint('Gagal mem-parse data LoRa dari baris serial: $e');
-      // Emit log konsol gagal
       _emitConsoleLog(
         nodeId: 'UNKNOWN',
         rawBytes: bytes,
