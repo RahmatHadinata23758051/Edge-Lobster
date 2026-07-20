@@ -36,10 +36,20 @@ class MqttPublisherService {
     required String password,
   }) async {
     _manualStopped = false;
-    _lastHost = host;
+    // Auto-sanitize host string: strip http://, https://, mqtt://, ws://, port numbers, and trailing slashes
+    String cleanHost = host.trim();
+    cleanHost = cleanHost.replaceAll(RegExp(r'^(https?://|mqtts?://|wss?://)'), '');
+    if (cleanHost.contains('/')) {
+      cleanHost = cleanHost.split('/').first;
+    }
+    if (cleanHost.contains(':')) {
+      cleanHost = cleanHost.split(':').first;
+    }
+
+    _lastHost = cleanHost;
     _lastPort = port;
-    _lastUsername = username;
-    _lastPassword = password;
+    _lastUsername = username.trim();
+    _lastPassword = password.trim();
 
     return _connectInternal();
   }
