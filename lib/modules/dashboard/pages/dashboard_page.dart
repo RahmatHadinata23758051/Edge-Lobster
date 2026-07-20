@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../../../core/models/telemetry_data.dart';
 import '../../../../core/services/serial_port_service.dart';
+import '../../../../core/services/mock_telemetry_service.dart';
+import '../../../../core/services/mqtt_publisher_service.dart';
 import '../../../../core/services/gateway_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../components/telemetry_panel.dart';
@@ -21,8 +23,14 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final SerialPortService _serialService = SerialPortService();
+  final MockTelemetryService _mockService = MockTelemetryService();
+  final MqttPublisherService _mqttService = MqttPublisherService();
+
   StreamSubscription<TelemetryData>? _telemetrySub;
+  StreamSubscription<TelemetryData>? _mockTelemetrySub;
   StreamSubscription<ConsoleLog>? _consoleSub;
+  StreamSubscription<bool>? _mqttStateSub;
+  StreamSubscription<String>? _mqttLogSub;
 
   TelemetryData? _currentData;
   final List<ConsoleLog> _consoleLogs = [];
@@ -48,15 +56,63 @@ class _DashboardPageState extends State<DashboardPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final s = Provider.of<GatewayStateProvider>(context, listen: false);
-      if (s.isSerialConnected) _startSerial(s);
+
+      // Listen for MQTT logs to show in terminal console panel
+      _mqttLogSub = _mqttService.logStream.listen((logMsg) {
+        if (mounted) {
+          setState(() {
+            _consoleLogs.add(ConsoleLog(
+              timestamp: DateTime.now(),
+              nodeId: 'MQTT',
+              rawBytes: Uint8List.fromList(utf8.encode(logMsg)),
+              isValid: true,
+              details: logMsg,
+            ));
+            if (_consoleLogs.length > 100) {
+              _consoleLogs.removeAt(0);
+            }
+          });
+        }
+      });
+
+      // Listen for MQTT connection state changes to update Provider state
+      _mqttStateSub = _mqttService.connectionStateStream.listen((isConn) {
+        if (mounted) {
+          s.setMqttConnected(isConn);
+        }
+      });
+
+      // Start serial stream or fallback mock
+      if (s.isSerialConnected) {
+        _startSerial(s);
+      } else {
+        _startMock(s);
+      }
+
+      // Start MQTT client if enabled
+      if (s.isMqttConnected) {
+        _startMqtt(s);
+      }
     });
+  }
+
+  void _onTelemetryReceived(TelemetryData d, GatewayStateProvider s) {
+    if (mounted) {
+      setState(() => _currentData = d);
+      if (s.isMqttConnected) {
+        _mqttService.publishTelemetry(d);
+      }
+    }
   }
 
   void _startSerial(GatewayStateProvider s) {
     _stopSerial();
+    _stopMock();
+
     _telemetrySub = _serialService.telemetryStream.listen((d) {
-      if (mounted) setState(() => _currentData = d);
+      _onTelemetryReceived(d, s);
     });
+
     _consoleSub = _serialService.rawConsoleStream.listen((log) {
       if (mounted) {
         setState(() {
@@ -67,40 +123,90 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     });
+
     final ok = _serialService.connect(s.activePort, s.baudRate);
     if (!ok) {
       s.setSerialConnected(false);
       setState(() {
         _consoleLogs.add(ConsoleLog(
-          timestamp: DateTime.now(), nodeId: 'SYSTEM',
-          rawBytes: Uint8List.fromList(utf8.encode('{"ts":"${DateTime.now().toIso8601String()}", "node":"AQ-01", "status":"ERROR: Port not available"}')),
-          isValid: false, details: 'PORT NOT FOUND',
+          timestamp: DateTime.now(),
+          nodeId: 'SYSTEM',
+          rawBytes: Uint8List.fromList(utf8.encode('{"ts":"${DateTime.now().toIso8601String()}", "node":"AQ-01", "status":"SERIAL PORT NOT FOUND - FALLBACK TO MOCK"}')),
+          isValid: false,
+          details: 'PORT NOT FOUND',
         ));
       });
+      _startMock(s);
     }
   }
 
+  void _startMock(GatewayStateProvider s) {
+    _stopMock();
+    _mockTelemetrySub = _mockService.telemetryStream.listen((d) {
+      _onTelemetryReceived(d, s);
+    });
+    _mockService.startGenerating(s.activeNodeId);
+  }
+
   void _stopSerial() {
-    _telemetrySub?.cancel(); _telemetrySub = null;
-    _consoleSub?.cancel(); _consoleSub = null;
+    _telemetrySub?.cancel();
+    _telemetrySub = null;
+    _consoleSub?.cancel();
+    _consoleSub = null;
     _serialService.disconnect();
+  }
+
+  void _stopMock() {
+    _mockTelemetrySub?.cancel();
+    _mockTelemetrySub = null;
+    _mockService.stopGenerating();
+  }
+
+  void _startMqtt(GatewayStateProvider s) {
+    _mqttService.connectWithConfig(
+      host: s.mqttHost,
+      port: s.mqttPort,
+      username: s.mqttUsername,
+      password: s.mqttPassword,
+    );
+  }
+
+  void _stopMqtt() {
+    _mqttService.disconnect();
+  }
+
+  void _toggleSerial(GatewayStateProvider s) {
+    if (s.isSerialConnected) {
+      _stopSerial();
+      s.setSerialConnected(false);
+      _startMock(s);
+    } else {
+      s.setSerialConnected(true);
+      _startSerial(s);
+    }
+  }
+
+  void _toggleMqtt(GatewayStateProvider s) {
+    if (s.isMqttConnected) {
+      _stopMqtt();
+      s.setMqttConnected(false);
+    } else {
+      s.setMqttConnected(true);
+      _startMqtt(s);
+    }
   }
 
   @override
   void dispose() {
     _clockTimer.cancel();
     _stopSerial();
+    _stopMock();
+    _mqttStateSub?.cancel();
+    _mqttLogSub?.cancel();
+    _mqttService.dispose();
     _serialService.dispose();
+    _mockService.dispose();
     super.dispose();
-  }
-
-  void _toggleSerial(GatewayStateProvider s) {
-    if (s.isSerialConnected) {
-      _stopSerial(); s.setSerialConnected(false);
-      setState(() => _currentData = null);
-    } else {
-      s.setSerialConnected(true); _startSerial(s);
-    }
   }
 
   // Indonesian Date Formatter for Clock Widget
@@ -277,10 +383,21 @@ class _DashboardPageState extends State<DashboardPage> {
                   SettingsPanel(
                     state: s,
                     onToggleSerial: () => _toggleSerial(s),
+                    onToggleMqtt: () => _toggleMqtt(s),
                     onSaved: () {
                       setState(() {
                         _selectedIndex = 0; // Automatically return to dashboard
                       });
+                      if (s.isSerialConnected) {
+                        _startSerial(s);
+                      } else {
+                        _startMock(s);
+                      }
+                      if (s.isMqttConnected) {
+                        _startMqtt(s);
+                      } else {
+                        _stopMqtt();
+                      }
                     },
                   ),
                 ],

@@ -7,12 +7,14 @@ class SettingsPanel extends StatefulWidget {
   final GatewayStateProvider state;
   final VoidCallback onSaved;
   final VoidCallback onToggleSerial;
+  final VoidCallback? onToggleMqtt;
 
   const SettingsPanel({
     super.key,
     required this.state,
     required this.onSaved,
     required this.onToggleSerial,
+    this.onToggleMqtt,
   });
 
   @override
@@ -155,7 +157,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               icon: Icons.cloud_sync,
                               label: 'MQTT Broker',
                               active: widget.state.isMqttConnected,
-                              onPressed: widget.state.toggleMqtt,
+                              onPressed: widget.onToggleMqtt ?? widget.state.toggleMqtt,
                             ),
                             const SizedBox(width: 12),
                             _connectionButton(

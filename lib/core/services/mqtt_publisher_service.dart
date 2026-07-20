@@ -1,0 +1,190 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:mqtt_client/mqtt_server_client.dart';
+import '../models/telemetry_data.dart';
+
+/// Service responsible for streaming telemetry data from Edge Gateway to MQTT Broker.
+class MqttPublisherService {
+  MqttServerClient? _client;
+  bool _isConnected = false;
+  bool _isConnecting = false;
+  Timer? _reconnectTimer;
+  int _reconnectDelaySeconds = 2;
+  static const int _maxReconnectDelaySeconds = 32;
+
+  String? _lastHost;
+  int? _lastPort;
+  String? _lastUsername;
+  String? _lastPassword;
+
+  final StreamController<bool> _connectionStateController = StreamController<bool>.broadcast();
+  Stream<bool> get connectionStateStream => _connectionStateController.stream;
+
+  final StreamController<String> _logController = StreamController<String>.broadcast();
+  Stream<String> get logStream => _logController.stream;
+
+  bool get isConnected => _isConnected;
+
+  /// Connect to MQTT Broker with provided host, port, and authentication credentials.
+  Future<bool> connectWithConfig({
+    required String host,
+    required int port,
+    required String username,
+    required String password,
+  }) async {
+    _lastHost = host;
+    _lastPort = port;
+    _lastUsername = username;
+    _lastPassword = password;
+
+    return _connectInternal();
+  }
+
+  Future<bool> _connectInternal() async {
+    if (_isConnected) return true;
+    if (_isConnecting) return false;
+    if (_lastHost == null || _lastPort == null) return false;
+
+    _isConnecting = true;
+    _log('Memulai koneksi ke MQTT Broker: ${_lastHost!}:${_lastPort!}...');
+
+    final String clientId = 'LobsenseEdge_${DateTime.now().millisecondsSinceEpoch}';
+    final MqttServerClient client = MqttServerClient.withPort(_lastHost!, clientId, _lastPort!);
+    _client = client;
+
+    client.logging(on: false);
+    client.setProtocolV311();
+    client.keepAlivePeriod = 30;
+    client.connectTimeoutPeriod = 5000;
+    client.autoReconnect = false; // Custom exponential backoff handler below
+
+    client.onConnected = _onConnected;
+    client.onDisconnected = _onDisconnected;
+
+    final connMessage = MqttConnectMessage()
+        .withClientIdentifier(clientId)
+        .startClean()
+        .withWillQos(MqttQos.atLeastOnce);
+
+    if (_lastUsername != null && _lastUsername!.isNotEmpty) {
+      connMessage.authenticateAs(_lastUsername!, _lastPassword ?? '');
+    }
+
+    client.connectionMessage = connMessage;
+
+    try {
+      await client.connect();
+    } catch (e) {
+      _log('Gagal menghubungkan ke MQTT Broker: $e');
+      _onConnectionFailed();
+      return false;
+    }
+
+    if (client.connectionStatus?.state == MqttConnectionState.connected) {
+      _isConnecting = false;
+      _isConnected = true;
+      _reconnectDelaySeconds = 2; // Reset backoff delay on successful connection
+      _connectionStateController.add(true);
+      _log('Berhasil terhubung ke MQTT Broker (${_lastHost!}:${_lastPort!}).');
+      return true;
+    } else {
+      _log('Status koneksi MQTT: ${client.connectionStatus?.state}');
+      _onConnectionFailed();
+      return false;
+    }
+  }
+
+  void _onConnected() {
+    _isConnected = true;
+    _isConnecting = false;
+    _reconnectDelaySeconds = 2;
+    _connectionStateController.add(true);
+    _log('Callback MQTT Terhubung aktif.');
+  }
+
+  void _onDisconnected() {
+    _isConnected = false;
+    _isConnecting = false;
+    _connectionStateController.add(false);
+    _log('Terputus dari MQTT Broker.');
+    _scheduleReconnect();
+  }
+
+  void _onConnectionFailed() {
+    _isConnected = false;
+    _isConnecting = false;
+    _connectionStateController.add(false);
+    try {
+      _client?.disconnect();
+    } catch (_) {}
+    _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _log('Menjadwalkan auto-reconnect MQTT dalam $_reconnectDelaySeconds detik...');
+    _reconnectTimer = Timer(Duration(seconds: _reconnectDelaySeconds), () {
+      if (!_isConnected && _lastHost != null) {
+        // Exponential backoff calculation (2s -> 4s -> 8s -> 16s -> 32s)
+        _reconnectDelaySeconds = (_reconnectDelaySeconds * 2).clamp(2, _maxReconnectDelaySeconds);
+        _connectInternal();
+      }
+    });
+  }
+
+  /// Publish structured TelemetryData object as JSON payload to topic `lobsense/telemetry/{nodeId}`.
+  Future<bool> publishTelemetry(TelemetryData data, {String? topicOverride}) async {
+    final String payloadJson = jsonEncode(data.toJson());
+    final String topic = topicOverride ?? 'lobsense/telemetry/${data.nodeId}';
+    return publishString(payloadJson, topic: topic);
+  }
+
+  /// Publish raw string payload to specific topic.
+  Future<bool> publishString(String payload, {required String topic}) async {
+    if (!_isConnected || _client == null) {
+      _log('Batal kirim MQTT: status belum terhubung.');
+      return false;
+    }
+
+    try {
+      final MqttClientPayloadBuilder builder = MqttClientPayloadBuilder();
+      builder.addString(payload);
+
+      _client!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+      _log('MQTT Published ke [$topic]: $payload');
+      return true;
+    } catch (e) {
+      _log('Gagal publish MQTT: $e');
+      return false;
+    }
+  }
+
+  /// Disconnect manually and stop reconnect timers.
+  void disconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    try {
+      _client?.disconnect();
+    } catch (_) {}
+    _client = null;
+    _isConnected = false;
+    _isConnecting = false;
+    _connectionStateController.add(false);
+    _log('MQTT Service dihentikan secara manual.');
+  }
+
+  void _log(String msg) {
+    debugPrint('[MQTT_SERVICE] $msg');
+    if (!_logController.isClosed) {
+      _logController.add(msg);
+    }
+  }
+
+  void dispose() {
+    disconnect();
+    _connectionStateController.close();
+    _logController.close();
+  }
+}
