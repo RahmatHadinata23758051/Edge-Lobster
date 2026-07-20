@@ -24,6 +24,7 @@ class SettingsPanel extends StatefulWidget {
 class _SettingsPanelState extends State<SettingsPanel> {
   late String _port;
   late int _baud;
+  late List<String> _availablePorts;
   late TextEditingController _nodeController;
   late TextEditingController _rtspController;
   late TextEditingController _mqttHostController;
@@ -36,12 +37,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
     super.initState();
     _port = widget.state.activePort;
     _baud = widget.state.baudRate;
+    _refreshAvailablePorts();
+
     _nodeController = TextEditingController(text: widget.state.activeNodeId);
     _rtspController = TextEditingController(text: widget.state.rtspUrl);
     _mqttHostController = TextEditingController(text: widget.state.mqttHost);
     _mqttPortController = TextEditingController(text: widget.state.mqttPort.toString());
     _mqttUserController = TextEditingController(text: widget.state.mqttUsername);
     _mqttPassController = TextEditingController(text: widget.state.mqttPassword);
+  }
+
+  void _refreshAvailablePorts() {
+    final ports = List<String>.from(SerialPortService.getAvailablePorts());
+    if (!ports.contains(_port)) {
+      ports.add(_port);
+    }
+    _availablePorts = ports;
   }
 
   @override
@@ -57,11 +68,6 @@ class _SettingsPanelState extends State<SettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> availablePorts = List.from(SerialPortService.getAvailablePorts());
-    if (!availablePorts.contains(_port)) {
-      availablePorts.add(_port);
-    }
-
     final List<int> standardBauds = [4800, 9600, 19200, 38400, 57600, 115200];
     if (!standardBauds.contains(_baud)) {
       standardBauds.add(_baud);
@@ -171,7 +177,21 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         const SizedBox(height: 24),
 
                         // Serial Config
-                        _sectTitle(Icons.usb, 'SERIAL PORT CONFIG'),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _sectTitle(Icons.usb, 'SERIAL PORT CONFIG'),
+                            IconButton(
+                              tooltip: 'Refresh Port List',
+                              icon: const Icon(Icons.refresh, size: 14, color: AppTheme.primaryGreen),
+                              onPressed: () {
+                                setState(() {
+                                  _refreshAvailablePorts();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -179,7 +199,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               child: _dropdownField<String>(
                                 label: 'Pilihan Port',
                                 value: _port,
-                                items: availablePorts.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 12)))).toList(),
+                                items: _availablePorts.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 12)))).toList(),
                                 onChanged: (val) {
                                   if (val != null) setState(() => _port = val);
                                 },
