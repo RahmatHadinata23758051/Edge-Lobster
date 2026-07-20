@@ -73,7 +73,7 @@ class MqttPublisherService {
     client.logging(on: false);
     client.setProtocolV311();
     client.keepAlivePeriod = 30;
-    client.connectTimeoutPeriod = 4000;
+    client.connectTimeoutPeriod = 3000; // Native socket timeout in ms
     client.autoReconnect = false;
 
     final connMessage = MqttConnectMessage()
@@ -88,16 +88,12 @@ class MqttPublisherService {
     client.connectionMessage = connMessage;
 
     try {
-      await client.connect().timeout(const Duration(seconds: 4), onTimeout: () {
-        throw TimeoutException('Koneksi MQTT socket timeout (4s)');
-      });
+      // Direct await without Future.timeout wrapper to prevent orphan background sockets
+      await client.connect();
     } catch (e) {
       _log('Gagal menghubungkan ke MQTT Broker: ${e.toString().split('\n').first}');
       _isConnecting = false;
       _setConnectionState(false);
-      try {
-        client.disconnect();
-      } catch (_) {}
       _scheduleReconnect();
       return false;
     }
@@ -118,9 +114,6 @@ class MqttPublisherService {
       _log('Status koneksi MQTT: ${client.connectionStatus?.state}');
       _isConnecting = false;
       _setConnectionState(false);
-      try {
-        client.disconnect();
-      } catch (_) {}
       _scheduleReconnect();
       return false;
     }
