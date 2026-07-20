@@ -26,7 +26,14 @@ class SerialPortService {
   /// Mendapatkan daftar port serial yang tersedia di sistem
   static List<String> getAvailablePorts() {
     try {
-      return SerialPort.availablePorts;
+      final ports = List<String>.from(SerialPort.availablePorts);
+      // Sort COM ports numerically (COM3, COM4, COM5, COM10)
+      ports.sort((a, b) {
+        final numA = int.tryParse(a.replaceAll(RegExp(r'\D'), '')) ?? 0;
+        final numB = int.tryParse(b.replaceAll(RegExp(r'\D'), '')) ?? 0;
+        return numA.compareTo(numB);
+      });
+      return ports;
     } catch (e) {
       debugPrint('Gagal mengambil daftar availablePorts: $e');
       return [];
