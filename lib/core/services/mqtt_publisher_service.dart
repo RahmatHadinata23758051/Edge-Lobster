@@ -88,8 +88,7 @@ class MqttPublisherService {
 
     final connMessage = MqttConnectMessage()
         .withClientIdentifier(clientId)
-        .startClean()
-        .withWillQos(MqttQos.atLeastOnce);
+        .startClean();
 
     if (_lastUsername != null && _lastUsername!.isNotEmpty) {
       connMessage.authenticateAs(_lastUsername!, _lastPassword ?? '');
