@@ -117,18 +117,23 @@ class SerialPortService {
       _subscription?.cancel();
       _subscription = null;
 
-      if (_reader != null) {
-        // SerialPortReader.close() mengurus penutupan & pembebasan native handle port secara internal
-        try {
-          _reader!.close();
-        } catch (_) {}
-        _reader = null;
-        _port = null;
-      } else if (_port != null) {
+      if (_port != null) {
         try {
           if (_port!.isOpen) {
             _port!.close();
           }
+        } catch (_) {}
+      }
+
+      if (_reader != null) {
+        try {
+          _reader!.close();
+        } catch (_) {}
+        _reader = null;
+      }
+
+      if (_port != null) {
+        try {
           _port!.dispose();
         } catch (_) {}
         _port = null;
