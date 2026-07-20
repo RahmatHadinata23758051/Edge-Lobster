@@ -78,7 +78,11 @@ class _DashboardPageState extends State<DashboardPage> {
       // Listen for MQTT connection state changes to update Provider state
       _mqttStateSub = _mqttService.connectionStateStream.listen((isConn) {
         if (mounted) {
-          s.setMqttConnected(isConn);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && s.isMqttConnected != isConn) {
+              s.setMqttConnected(isConn);
+            }
+          });
         }
       });
 

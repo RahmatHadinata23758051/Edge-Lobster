@@ -48,7 +48,20 @@ class MqttPublisherService {
     if (_lastHost == null || _lastPort == null) return false;
 
     _isConnecting = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
     _log('Memulai koneksi ke MQTT Broker: ${_lastHost!}:${_lastPort!}...');
+
+    // Clean up any old client instance
+    if (_client != null) {
+      _client!.onDisconnected = null;
+      _client!.onConnected = null;
+      try {
+        _client!.disconnect();
+      } catch (_) {}
+      _client = null;
+    }
 
     final String clientId = 'LobsenseEdge_${DateTime.now().millisecondsSinceEpoch}';
     final MqttServerClient client = MqttServerClient.withPort(_lastHost!, clientId, _lastPort!);
@@ -57,11 +70,8 @@ class MqttPublisherService {
     client.logging(on: false);
     client.setProtocolV311();
     client.keepAlivePeriod = 30;
-    client.connectTimeoutPeriod = 5000;
-    client.autoReconnect = false; // Custom exponential backoff handler below
-
-    client.onConnected = _onConnected;
-    client.onDisconnected = _onDisconnected;
+    client.connectTimeoutPeriod = 3000;
+    client.autoReconnect = false; // We handle exponential backoff reconnect explicitly
 
     final connMessage = MqttConnectMessage()
         .withClientIdentifier(clientId)
@@ -77,8 +87,10 @@ class MqttPublisherService {
     try {
       await client.connect();
     } catch (e) {
-      _log('Gagal menghubungkan ke MQTT Broker: $e');
-      _onConnectionFailed();
+      _log('Gagal menghubungkan ke MQTT Broker: ${e.toString().split('\n').first}');
+      _isConnecting = false;
+      _setConnectionState(false);
+      _scheduleReconnect();
       return false;
     }
 
@@ -86,13 +98,29 @@ class MqttPublisherService {
       _isConnecting = false;
       _isConnected = true;
       _reconnectDelaySeconds = 2; // Reset backoff delay on successful connection
-      _connectionStateController.add(true);
+      
+      // Set callbacks AFTER successful connection
+      client.onConnected = _onConnected;
+      client.onDisconnected = _onDisconnected;
+
+      _setConnectionState(true);
       _log('Berhasil terhubung ke MQTT Broker (${_lastHost!}:${_lastPort!}).');
       return true;
     } else {
       _log('Status koneksi MQTT: ${client.connectionStatus?.state}');
-      _onConnectionFailed();
+      _isConnecting = false;
+      _setConnectionState(false);
+      _scheduleReconnect();
       return false;
+    }
+  }
+
+  void _setConnectionState(bool value) {
+    if (_isConnected != value) {
+      _isConnected = value;
+      if (!_connectionStateController.isClosed) {
+        _connectionStateController.add(value);
+      }
     }
   }
 
@@ -100,34 +128,25 @@ class MqttPublisherService {
     _isConnected = true;
     _isConnecting = false;
     _reconnectDelaySeconds = 2;
-    _connectionStateController.add(true);
+    _setConnectionState(true);
     _log('Callback MQTT Terhubung aktif.');
   }
 
   void _onDisconnected() {
-    _isConnected = false;
+    _setConnectionState(false);
     _isConnecting = false;
-    _connectionStateController.add(false);
     _log('Terputus dari MQTT Broker.');
     _scheduleReconnect();
   }
 
-  void _onConnectionFailed() {
-    _isConnected = false;
-    _isConnecting = false;
-    _connectionStateController.add(false);
-    try {
-      _client?.disconnect();
-    } catch (_) {}
-    _scheduleReconnect();
-  }
-
   void _scheduleReconnect() {
-    _reconnectTimer?.cancel();
+    if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
+
     _log('Menjadwalkan auto-reconnect MQTT dalam $_reconnectDelaySeconds detik...');
     _reconnectTimer = Timer(Duration(seconds: _reconnectDelaySeconds), () {
+      _reconnectTimer = null;
       if (!_isConnected && _lastHost != null) {
-        // Exponential backoff calculation (2s -> 4s -> 8s -> 16s -> 32s)
+        // Exponential backoff calculation (2s -> 4s -> 8s -> 16s -> max 32s)
         _reconnectDelaySeconds = (_reconnectDelaySeconds * 2).clamp(2, _maxReconnectDelaySeconds);
         _connectInternal();
       }
@@ -144,7 +163,6 @@ class MqttPublisherService {
   /// Publish raw string payload to specific topic.
   Future<bool> publishString(String payload, {required String topic}) async {
     if (!_isConnected || _client == null) {
-      _log('Batal kirim MQTT: status belum terhubung.');
       return false;
     }
 
@@ -165,13 +183,16 @@ class MqttPublisherService {
   void disconnect() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-    try {
-      _client?.disconnect();
-    } catch (_) {}
-    _client = null;
-    _isConnected = false;
+    if (_client != null) {
+      _client!.onDisconnected = null;
+      _client!.onConnected = null;
+      try {
+        _client!.disconnect();
+      } catch (_) {}
+      _client = null;
+    }
+    _setConnectionState(false);
     _isConnecting = false;
-    _connectionStateController.add(false);
     _log('MQTT Service dihentikan secara manual.');
   }
 
