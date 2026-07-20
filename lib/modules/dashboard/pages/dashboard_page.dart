@@ -129,7 +129,10 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     final ok = _serialService.connect(s.activePort, s.baudRate);
-    if (!ok) {
+    if (ok) {
+      s.setSerialConnected(true);
+      _stopMock();
+    } else {
       s.setSerialConnected(false);
       setState(() {
         _consoleLogs.add(ConsoleLog(
@@ -185,7 +188,6 @@ class _DashboardPageState extends State<DashboardPage> {
       s.setSerialConnected(false);
       _startMock(s);
     } else {
-      s.setSerialConnected(true);
       _startSerial(s);
     }
   }
