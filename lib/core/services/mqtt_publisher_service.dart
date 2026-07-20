@@ -10,6 +10,7 @@ class MqttPublisherService {
   MqttServerClient? _client;
   bool _isConnected = false;
   bool _isConnecting = false;
+  bool _manualStopped = false;
   Timer? _reconnectTimer;
   int _reconnectDelaySeconds = 2;
   static const int _maxReconnectDelaySeconds = 32;
@@ -34,6 +35,7 @@ class MqttPublisherService {
     required String username,
     required String password,
   }) async {
+    _manualStopped = false;
     _lastHost = host;
     _lastPort = port;
     _lastUsername = username;
@@ -43,9 +45,10 @@ class MqttPublisherService {
   }
 
   Future<bool> _connectInternal() async {
+    if (_manualStopped) return false;
     if (_isConnected) return true;
     if (_isConnecting) return false;
-    if (_lastHost == null || _lastPort == null) return false;
+    if (_lastHost == null || _lastHost!.trim().isEmpty || _lastPort == null) return false;
 
     _isConnecting = true;
     _reconnectTimer?.cancel();
@@ -53,7 +56,7 @@ class MqttPublisherService {
 
     _log('Memulai koneksi ke MQTT Broker: ${_lastHost!}:${_lastPort!}...');
 
-    // Clean up any old client instance
+    // Clean up any previous client instance cleanly
     if (_client != null) {
       _client!.onDisconnected = null;
       _client!.onConnected = null;
@@ -70,8 +73,8 @@ class MqttPublisherService {
     client.logging(on: false);
     client.setProtocolV311();
     client.keepAlivePeriod = 30;
-    client.connectTimeoutPeriod = 3000;
-    client.autoReconnect = false; // We handle exponential backoff reconnect explicitly
+    client.connectTimeoutPeriod = 4000;
+    client.autoReconnect = false;
 
     final connMessage = MqttConnectMessage()
         .withClientIdentifier(clientId)
@@ -85,11 +88,16 @@ class MqttPublisherService {
     client.connectionMessage = connMessage;
 
     try {
-      await client.connect();
+      await client.connect().timeout(const Duration(seconds: 4), onTimeout: () {
+        throw TimeoutException('Koneksi MQTT socket timeout (4s)');
+      });
     } catch (e) {
       _log('Gagal menghubungkan ke MQTT Broker: ${e.toString().split('\n').first}');
       _isConnecting = false;
       _setConnectionState(false);
+      try {
+        client.disconnect();
+      } catch (_) {}
       _scheduleReconnect();
       return false;
     }
@@ -110,6 +118,9 @@ class MqttPublisherService {
       _log('Status koneksi MQTT: ${client.connectionStatus?.state}');
       _isConnecting = false;
       _setConnectionState(false);
+      try {
+        client.disconnect();
+      } catch (_) {}
       _scheduleReconnect();
       return false;
     }
@@ -140,15 +151,20 @@ class MqttPublisherService {
   }
 
   void _scheduleReconnect() {
+    if (_manualStopped) return;
     if (_reconnectTimer != null && _reconnectTimer!.isActive) return;
 
     _log('Menjadwalkan auto-reconnect MQTT dalam $_reconnectDelaySeconds detik...');
-    _reconnectTimer = Timer(Duration(seconds: _reconnectDelaySeconds), () {
+    _reconnectTimer = Timer(Duration(seconds: _reconnectDelaySeconds), () async {
       _reconnectTimer = null;
-      if (!_isConnected && _lastHost != null) {
+      if (!_manualStopped && !_isConnected && _lastHost != null) {
         // Exponential backoff calculation (2s -> 4s -> 8s -> 16s -> max 32s)
         _reconnectDelaySeconds = (_reconnectDelaySeconds * 2).clamp(2, _maxReconnectDelaySeconds);
-        _connectInternal();
+        try {
+          await _connectInternal();
+        } catch (e) {
+          _log('Exception caught in reconnect timer: $e');
+        }
       }
     });
   }
@@ -181,6 +197,7 @@ class MqttPublisherService {
 
   /// Disconnect manually and stop reconnect timers.
   void disconnect() {
+    _manualStopped = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     if (_client != null) {
