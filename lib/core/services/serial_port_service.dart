@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
@@ -55,9 +56,20 @@ class SerialPortService {
 
       final port = SerialPort(portAddress);
 
-      if (!port.openReadWrite()) {
+      bool opened = false;
+      for (int attempt = 1; attempt <= 3; attempt++) {
+        if (port.openReadWrite()) {
+          opened = true;
+          break;
+        }
+        if (attempt < 3) {
+          sleep(const Duration(milliseconds: 150));
+        }
+      }
+
+      if (!opened) {
         final err = SerialPort.lastError;
-        debugPrint('Gagal membuka port serial $portAddress: $err');
+        debugPrint('Gagal membuka port serial $portAddress setelah 3x percobaan: $err');
         try {
           port.dispose();
         } catch (_) {}
