@@ -14,6 +14,8 @@ import '../components/video_panel.dart';
 import '../components/console_panel.dart';
 import '../components/settings_panel.dart';
 
+import '../../../../core/services/offline_buffer_service.dart';
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -25,6 +27,7 @@ class _DashboardPageState extends State<DashboardPage> {
   final SerialPortService _serialService = SerialPortService();
   final MockTelemetryService _mockService = MockTelemetryService();
   final MqttPublisherService _mqttService = MqttPublisherService();
+  final OfflineBufferService _bufferService = OfflineBufferService();
 
   StreamSubscription<TelemetryData>? _telemetrySub;
   StreamSubscription<TelemetryData>? _mockTelemetrySub;
@@ -45,6 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _bufferService.init();
     _currentTime = DateTime.now();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
@@ -54,26 +58,26 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     });
 
+    // Listen for MQTT logs to show in terminal console panel
+    _mqttLogSub = _mqttService.logStream.listen((logMsg) {
+      if (mounted) {
+        setState(() {
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: 'MQTT',
+            rawBytes: Uint8List.fromList(utf8.encode(logMsg)),
+            isValid: true,
+            details: logMsg,
+          ));
+          if (_consoleLogs.length > 100) {
+            _consoleLogs.removeAt(0);
+          }
+        });
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final s = Provider.of<GatewayStateProvider>(context, listen: false);
-
-      // Listen for MQTT logs to show in terminal console panel
-      _mqttLogSub = _mqttService.logStream.listen((logMsg) {
-        if (mounted) {
-          setState(() {
-            _consoleLogs.add(ConsoleLog(
-              timestamp: DateTime.now(),
-              nodeId: 'MQTT',
-              rawBytes: Uint8List.fromList(utf8.encode(logMsg)),
-              isValid: true,
-              details: logMsg,
-            ));
-            if (_consoleLogs.length > 100) {
-              _consoleLogs.removeAt(0);
-            }
-          });
-        }
-      });
 
       // Listen for MQTT connection state changes to update Provider state
       _mqttStateSub = _mqttService.connectionStateStream.listen((isConn) {
@@ -83,6 +87,9 @@ class _DashboardPageState extends State<DashboardPage> {
               s.setMqttConnected(isConn);
             }
           });
+        }
+        if (isConn) {
+          _bufferService.flushBuffer(_mqttService);
         }
       });
 
@@ -100,11 +107,17 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _onTelemetryReceived(TelemetryData d, GatewayStateProvider s) {
+  void _onTelemetryReceived(TelemetryData d, GatewayStateProvider s) async {
     if (mounted) {
       setState(() => _currentData = d);
-      if (s.isMqttConnected) {
-        _mqttService.publishTelemetry(d);
+
+      if (s.isMqttConnected && _mqttService.isConnected) {
+        final ok = await _mqttService.publishTelemetry(d);
+        if (!ok) {
+          await _bufferService.insertTelemetry(d);
+        }
+      } else {
+        await _bufferService.insertTelemetry(d);
       }
     }
   }
@@ -370,6 +383,33 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 6),
+                ValueListenableBuilder<int>(
+                  valueListenable: _bufferService.pendingCountNotifier,
+                  builder: (context, count, child) {
+                    return Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: count > 0 ? const Color(0xFFFF9800) : AppTheme.accentGreen,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          count > 0 ? 'Buffer: $count Pending' : 'Buffer SQLite Ready',
+                          style: TextStyle(
+                            color: count > 0 ? const Color(0xFFFF9800) : AppTheme.t2,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

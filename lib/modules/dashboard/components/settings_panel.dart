@@ -3,6 +3,8 @@ import '../../../../core/services/gateway_state_provider.dart';
 import '../../../../core/services/serial_port_service.dart';
 import '../../../../core/theme/app_theme.dart';
 
+import '../../../../core/services/offline_buffer_service.dart';
+
 class SettingsPanel extends StatefulWidget {
   final GatewayStateProvider state;
   final VoidCallback onSaved;
@@ -191,6 +193,18 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               label: 'API Cloud Sync',
                               active: widget.state.isInternetConnected,
                               onPressed: widget.state.toggleInternet,
+                            ),
+                            const SizedBox(width: 12),
+                            ValueListenableBuilder<int>(
+                              valueListenable: OfflineBufferService().pendingCountNotifier,
+                              builder: (context, pendingCount, child) {
+                                return _connectionButton(
+                                  icon: Icons.sd_storage,
+                                  label: pendingCount > 0 ? 'Buffer: $pendingCount Pending' : 'Buffer SQLite Ready',
+                                  active: pendingCount == 0,
+                                  onPressed: () {},
+                                );
+                              },
                             ),
                           ],
                         ),
