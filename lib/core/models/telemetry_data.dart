@@ -93,7 +93,7 @@ class TelemetryData {
       'battery_current': batteryCurrent,
       'latitude': latitude,
       'longitude': longitude,
-      'timestamp': timestamp.toIso8601String(),
+      'timestamp': timestamp.toUtc().toIso8601String(),
     };
   }
 
