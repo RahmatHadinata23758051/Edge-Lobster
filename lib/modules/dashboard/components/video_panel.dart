@@ -25,13 +25,38 @@ class _VideoPanelState extends State<VideoPanel> {
   }
 
   void _initPlayer() {
+    if (widget.rtspUrl.trim().isEmpty) {
+      if (mounted) setState(() => _hasError = true);
+      return;
+    }
+
     try {
       final p = Player();
       final c = VideoController(p);
-      setState(() { _player = p; _controller = c; _hasError = false; });
-      p.open(Media(widget.rtspUrl));
+
+      p.stream.error.listen((err) {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _player = p;
+          _controller = c;
+          _hasError = false;
+        });
+      }
+
+      p.open(Media(widget.rtspUrl), play: true);
     } catch (e) {
-      setState(() { _hasError = true; });
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
     }
   }
 
@@ -40,13 +65,30 @@ class _VideoPanelState extends State<VideoPanel> {
     super.didUpdateWidget(old);
     if (old.rtspUrl != widget.rtspUrl) {
       if (_player != null && !_hasError) {
-        try { _player!.open(Media(widget.rtspUrl)); } catch (_) { setState(() => _hasError = true); }
-      } else { _initPlayer(); }
+        try {
+          _player!.open(Media(widget.rtspUrl));
+        } catch (_) {
+          if (mounted) setState(() => _hasError = true);
+        }
+      } else {
+        _initPlayer();
+      }
     }
   }
 
   @override
-  void dispose() { _player?.dispose(); super.dispose(); }
+  void dispose() {
+    final player = _player;
+    _player = null;
+    _controller = null;
+    if (player != null) {
+      try {
+        player.stop();
+        player.dispose();
+      } catch (_) {}
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +156,6 @@ class _VideoPanelState extends State<VideoPanel> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Subtle grid lines matching reference screenshot grid
           Opacity(
             opacity: 0.04,
             child: GridPaper(
@@ -123,7 +164,6 @@ class _VideoPanelState extends State<VideoPanel> {
               subdivisions: 1,
             ),
           ),
-          // Fallback UI
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
