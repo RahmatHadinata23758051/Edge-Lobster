@@ -18,7 +18,7 @@ class GatewayStateProvider extends ChangeNotifier {
   String _mqttHost = 'app.lobsens-unpad.web.id';
   int _mqttPort = 1883;
   String _mqttUsername = 'lobsense_mqtt';
-  String _mqttPassword = '';
+  String _mqttPassword = 'Lobster123!';
 
   bool _isInitialized = false;
 
@@ -62,8 +62,10 @@ class GatewayStateProvider extends ChangeNotifier {
       _rtspUrl = prefs.getString('rtspUrl') ?? 'rtsp://192.168.100.50:554/stream1';
       _mqttHost = prefs.getString('mqttHost') ?? '103.67.78.91';
       _mqttPort = prefs.getInt('mqttPort') ?? 1883;
-      _mqttUsername = prefs.getString('mqttUsername') ?? 'lobsense_mqtt';
       _mqttPassword = prefs.getString('mqttPassword') ?? '';
+      if (_mqttPassword.isEmpty) {
+        _mqttPassword = 'Lobster123!';
+      }
       _isInitialized = true;
       notifyListeners();
     } catch (e) {
