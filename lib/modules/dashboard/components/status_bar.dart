@@ -32,16 +32,40 @@ class StatusBar extends StatelessWidget {
           // Left: App Name and Node Name
           Row(
             children: [
-              const Icon(Icons.developer_board, color: Colors.blueAccent, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'LOBSENSE EDGE GATEWAY',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.developer_board, color: Color(0xFF0D9D1B), size: 20),
                 ),
+              ),
+              const SizedBox(width: 10),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Edge Lobsense',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  Text(
+                    'Lobster Sensing System',
+                    style: TextStyle(
+                      color: Color(0xFF0D9D1B),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8.5,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
               Container(
