@@ -278,14 +278,23 @@ class _DashboardPageState extends State<DashboardPage> {
                 // Logo & Title
                 Row(
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentGreen,
-                        borderRadius: BorderRadius.circular(10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentGreen,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.shield_outlined, color: Colors.white, size: 20),
+                        ),
                       ),
-                      child: const Icon(Icons.verified_user, color: Colors.white, size: 18),
                     ),
                     const SizedBox(width: 10),
                     const Column(
@@ -293,12 +302,12 @@ class _DashboardPageState extends State<DashboardPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'AQUANODE',
-                          style: TextStyle(color: AppTheme.t1, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                          'Edge Lobsense',
+                          style: TextStyle(color: AppTheme.t1, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
                         ),
                         Text(
-                          'EDGE - GATEWAY 01',
-                          style: TextStyle(color: AppTheme.t3, fontSize: 9, fontWeight: FontWeight.bold),
+                          'Lobster Sensing System',
+                          style: TextStyle(color: AppTheme.accentGreen, fontSize: 8.5, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                         ),
                       ],
                     ),
