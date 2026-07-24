@@ -93,11 +93,12 @@ class _DashboardPageState extends State<DashboardPage> {
         }
       });
 
-      // Start serial stream or fallback mock
+      // Start serial stream if enabled, otherwise stop all streams
       if (s.isSerialConnected) {
         _startSerial(s);
       } else {
-        _startMock(s);
+        _stopSerial();
+        _stopMock();
       }
 
       // Start MQTT client if enabled
@@ -147,25 +148,21 @@ class _DashboardPageState extends State<DashboardPage> {
       _stopMock();
     } else {
       s.setSerialConnected(false);
-      setState(() {
-        _consoleLogs.add(ConsoleLog(
-          timestamp: DateTime.now(),
-          nodeId: 'SYSTEM',
-          rawBytes: Uint8List.fromList(utf8.encode('{"ts":"${DateTime.now().toIso8601String()}", "node":"AQ-01", "status":"SERIAL PORT NOT FOUND - FALLBACK TO MOCK"}')),
-          isValid: false,
-          details: 'PORT NOT FOUND',
-        ));
-      });
-      _startMock(s);
+      _stopSerial();
+      _stopMock();
+      if (mounted) {
+        setState(() {
+          _currentData = null;
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: 'SYSTEM',
+            rawBytes: Uint8List.fromList(utf8.encode('{"ts":"${DateTime.now().toIso8601String()}", "node":"${s.activeNodeId}", "status":"SERIAL PORT ${s.activePort} NOT FOUND - AWAITING REAL DEVICE"}')),
+            isValid: false,
+            details: 'PORT NOT FOUND - AWAITING DEVICE',
+          ));
+        });
+      }
     }
-  }
-
-  void _startMock(GatewayStateProvider s) {
-    _stopMock();
-    _mockTelemetrySub = _mockService.telemetryStream.listen((d) {
-      _onTelemetryReceived(d, s);
-    });
-    _mockService.startGenerating(s.activeNodeId);
   }
 
   void _stopSerial() {
@@ -198,8 +195,20 @@ class _DashboardPageState extends State<DashboardPage> {
   void _toggleSerial(GatewayStateProvider s) {
     if (s.isSerialConnected) {
       _stopSerial();
+      _stopMock();
       s.setSerialConnected(false);
-      _startMock(s);
+      if (mounted) {
+        setState(() {
+          _currentData = null;
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: 'SYSTEM',
+            rawBytes: Uint8List.fromList(utf8.encode('{"status":"SERIAL PORT & TELEMETRY STREAM STOPPED"}')),
+            isValid: true,
+            details: 'SERIAL PORT STOPPED (NONAKTIF)',
+          ));
+        });
+      }
     } else {
       _startSerial(s);
     }
@@ -312,10 +321,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         _formatTime(_currentTime),
                         style: const TextStyle(
                           color: AppTheme.deepGreen,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          height: 1.1,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -331,7 +339,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 // Menu Section Title
                 const Text(
@@ -339,8 +347,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   style: TextStyle(
                     color: AppTheme.t3,
                     fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -348,7 +356,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 // Menu list: Dashboard
                 _sidebarMenuItem(
                   index: 0,
-                  icon: Icons.grid_view_outlined,
+                  icon: Icons.dashboard_outlined,
                   label: 'Dashboard',
                 ),
                 const SizedBox(height: 6),
@@ -362,54 +370,67 @@ class _DashboardPageState extends State<DashboardPage> {
 
                 const Spacer(),
 
-                // Connection indicator anchored to bottom
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: s.isSerialConnected ? AppTheme.accentGreen : AppTheme.danger,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      s.isSerialConnected ? 'LoRa Terhubung' : 'LoRa Terputus',
-                      style: const TextStyle(
-                        color: AppTheme.t1,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ValueListenableBuilder<int>(
-                  valueListenable: _bufferService.pendingCountNotifier,
-                  builder: (context, count, child) {
-                    return Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: count > 0 ? const Color(0xFFFF9800) : AppTheme.accentGreen,
-                            shape: BoxShape.circle,
+                // Connection Status Summary Cards at sidebar bottom
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.danger,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          count > 0 ? 'Buffer: $count Pending' : 'Buffer SQLite Ready',
-                          style: TextStyle(
-                            color: count > 0 ? const Color(0xFFFF9800) : AppTheme.t2,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(width: 8),
+                          Text(
+                            s.isSerialConnected && _currentData != null ? 'LoRa Terhubung' : 'LoRa Terputus',
+                            style: TextStyle(
+                              color: s.isSerialConnected && _currentData != null ? AppTheme.t1 : AppTheme.t2,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ValueListenableBuilder<int>(
+                        valueListenable: _bufferService.pendingCountNotifier,
+                        builder: (context, count, child) {
+                          return Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: count > 0 ? const Color(0xFFFF9800) : AppTheme.accentGreen,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                count > 0 ? 'Buffer: $count Pending' : 'Buffer SQLite Ready',
+                                style: TextStyle(
+                                  color: count > 0 ? const Color(0xFFFF9800) : AppTheme.t2,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -437,7 +458,11 @@ class _DashboardPageState extends State<DashboardPage> {
                       if (s.isSerialConnected) {
                         _startSerial(s);
                       } else {
-                        _startMock(s);
+                        _stopSerial();
+                        _stopMock();
+                        setState(() {
+                          _currentData = null;
+                        });
                       }
                       if (s.isMqttConnected) {
                         _startMqtt(s);
@@ -526,7 +551,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: s.isSerialConnected && _currentData != null ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -535,16 +560,16 @@ class _DashboardPageState extends State<DashboardPage> {
                   Container(
                     width: 5,
                     height: 5,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.accentGreen,
+                    decoration: BoxDecoration(
+                      color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.t3,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Text(
-                    '6 sensor aktif',
+                  Text(
+                    s.isSerialConnected && _currentData != null ? '6 sensor aktif' : '0 sensor aktif',
                     style: TextStyle(
-                      color: AppTheme.deepGreen,
+                      color: s.isSerialConnected && _currentData != null ? AppTheme.deepGreen : AppTheme.t3,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -566,7 +591,10 @@ class _DashboardPageState extends State<DashboardPage> {
               // 3x2 Sensor Grid
               Expanded(
                 flex: 5,
-                child: TelemetryPanel(data: _currentData),
+                child: TelemetryPanel(
+                  data: _currentData,
+                  isSerialConnected: s.isSerialConnected,
+                ),
               ),
               const SizedBox(width: 12),
               // CCTV Camera aspect-ratio matched on the right
