@@ -19,26 +19,26 @@ Dalam ekosistem **Lobster Sensing System**, Edge Gateway bertindak sebagai peran
 
 ```mermaid
 flowchart TD
-    subgraph Input Serial & LoRa
-        Radio[Modul LoRa Receiver RS-485/USB] -->|Raw Byte Stream| Serial[libserialport Stream Reader]
-        Serial -->|Bytes Array| Parser[LoRaParser Engine]
-        Parser -->|Verifikasi Checksum CRC| ValidData{Valid?}
-        ValidData -->|Tidak| Drop[Drop Corrupted Packet]
-        ValidData -->|Ya| TelemetryObject[TelemetryData Model]
+    subgraph Input_Serial["Input Serial & LoRa"]
+        Radio["Modul LoRa Receiver RS-485/USB"] -->|Raw Byte Stream| Serial["libserialport Stream Reader"]
+        Serial -->|Bytes Array| Parser["LoRaParser Engine"]
+        Parser -->|Verifikasi Checksum CRC| ValidData{"Valid?"}
+        ValidData -->|Tidak| Drop["Drop Corrupted Packet"]
+        ValidData -->|Ya| TelemetryObject["TelemetryData Model"]
     end
 
-    subgraph Dual Persistence & Sync Loop
-        TelemetryObject --> CheckNet{Koneksi Cloud Available?}
-        CheckNet -->|Online| CloudSync[POST /api/v2/monitoring/telemetry]
-        CheckNet -->|Offline| LocalDB[(SQLite Local Buffer)]
-        LocalDB -->|Network Restored Event| AutoSync[Auto-Sync Worker]
+    subgraph Dual_Persistence["Dual Persistence & Sync Loop"]
+        TelemetryObject --> CheckNet{"Koneksi Cloud Available?"}
+        CheckNet -->|Online| CloudSync["POST /api/v2/monitoring/telemetry"]
+        CheckNet -->|Offline| LocalDB[("SQLite Local Buffer")]
+        LocalDB -->|Network Restored Event| AutoSync["Auto-Sync Worker"]
         AutoSync --> CloudSync
-        CloudSync -->|Success 200 OK| MarkSynced[Hapus Buffer Lokal]
+        CloudSync -->|Success 200 OK| MarkSynced["Hapus Buffer Lokal"]
     end
 
-    subgraph Output UI & Local Broadcast
-        TelemetryObject --> UI[Flutter Desktop Dashboard UI]
-        TelemetryObject --> LocalMQTT[Local LAN MQTT Broker]
+    subgraph Output_UI["Output UI & Local Broadcast"]
+        TelemetryObject --> UI["Flutter Desktop Dashboard UI"]
+        TelemetryObject --> LocalMQTT["Local LAN MQTT Broker"]
     end
 ```
 
