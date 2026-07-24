@@ -71,7 +71,9 @@ class SerialPortService {
         final err = SerialPort.lastError;
         debugPrint('Gagal membuka port serial $portAddress setelah 3x percobaan: $err');
         try {
-          port.dispose();
+          if (port.isOpen) {
+            port.close();
+          }
         } catch (_) {}
         return false;
       }
@@ -111,34 +113,37 @@ class SerialPortService {
     }
   }
 
-  /// Memutuskan koneksi port serial dan membersihkan resource secara aman (mencegah C FFI double-free)
+  /// Memutuskan koneksi port serial dan membersihkan resource secara aman (mencegah C FFI double-free & CRT assertion failure)
   void disconnect() {
     try {
+      // 1. Batalkan subscription stream listener Dart
       _subscription?.cancel();
       _subscription = null;
 
+      // 2. Tutup SerialPortReader terlebih dahulu agar background reader thread C di libserialport berhenti
+      if (_reader != null) {
+        try {
+          _reader!.close();
+        } catch (e) {
+          debugPrint('Error closing SerialPortReader: $e');
+        }
+        _reader = null;
+      }
+
+      // 3. Tutup handle native SerialPort secara aman tanpa memanggil dispose() yang memicu CRT Heap Assertion Failure (double-free)
       if (_port != null) {
         try {
           if (_port!.isOpen) {
             _port!.close();
           }
-        } catch (_) {}
-      }
-
-      if (_reader != null) {
-        try {
-          _reader!.close();
-        } catch (_) {}
-        _reader = null;
-      }
-
-      if (_port != null) {
-        try {
-          _port!.dispose();
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Error closing SerialPort: $e');
+        }
         _port = null;
       }
-      debugPrint('Koneksi Serial diputus.');
+
+      _rxBuffer.clear();
+      debugPrint('Koneksi Serial diputus secara aman.');
     } catch (e) {
       debugPrint('Error saat memutuskan koneksi serial: $e');
     }
