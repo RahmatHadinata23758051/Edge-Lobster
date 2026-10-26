@@ -42,7 +42,6 @@ class MockTelemetryService {
     final ambientTemp = 29.1 + (_random.nextDouble() * 2.0 - 1.0); // 28.1 - 30.1 C
     final ph = 7.42 + (_random.nextDouble() * 0.4 - 0.2); // 7.22 - 7.62
     final tds = 420.5 + (_random.nextDouble() * 20.0 - 10.0); // 410.5 - 430.5 ppm
-    final salinity = 32.1 + (_random.nextDouble() * 2.0 - 1.0); // 31.1 - 33.1 ppt
     final doVal = 6.8 + (_random.nextDouble() * 1.0 - 0.5); // 6.3 - 7.3 mg/L
     final turbidity = 12.4 + (_random.nextDouble() * 4.0 - 2.0); // 10.4 - 14.4 NTU
     final flow = 0.35 + (_random.nextDouble() * 0.1 - 0.05); // 0.30 - 0.40 m/s
@@ -64,7 +63,7 @@ class MockTelemetryService {
       temperature: double.parse(temp.toStringAsFixed(2)),
       ambientTemperature: double.parse(ambientTemp.toStringAsFixed(2)),
       ph: double.parse(ph.toStringAsFixed(2)),
-      salinity: double.parse(salinity.toStringAsFixed(2)),
+      salinity: 0.0,
       tds: double.parse(tds.toStringAsFixed(2)),
       dissolvedOxygen: double.parse(doVal.toStringAsFixed(2)),
       turbidity: double.parse(turbidity.toStringAsFixed(2)),
@@ -75,6 +74,8 @@ class MockTelemetryService {
       batteryCurrent: double.parse(batteryA.toStringAsFixed(2)),
       latitude: double.parse(lat.toStringAsFixed(6)),
       longitude: double.parse(lon.toStringAsFixed(6)),
+      altitude: 1.2,
+      pumpStatus: 1,
       timestamp: DateTime.now(),
     );
   }

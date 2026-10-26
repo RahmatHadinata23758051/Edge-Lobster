@@ -1,20 +1,22 @@
 class TelemetryData {
   final String serialNumber;
   final String cageCode;
-  final double temperature; // Maps to water_temperature
+  final double temperature; // Maps to temperature_node / water_temperature
   final double ambientTemperature; // Maps to ambient_temperature
   final double ph;
-  final double salinity;
+  final double salinity; // Optional/legacy (default 0.0)
   final double tds;
-  final double dissolvedOxygen;
+  final double dissolvedOxygen; // Maps to raw_dissolved_oxygen / dissolved_oxygen
   final double turbidity;
-  final double flowSpeed; // Maps to flow_rate
+  final double flowSpeed; // Maps to flow_rate / flow_speed
   final double solarVoltage;
   final double solarCurrent;
   final double batteryVoltage;
   final double batteryCurrent;
   final double latitude;
   final double longitude;
+  final double altitude;
+  final int pumpStatus; // 0: OFF, 1: ON (aktuator pompa/aerator)
   final DateTime timestamp;
 
   String get nodeId => serialNumber;
@@ -25,7 +27,7 @@ class TelemetryData {
     required this.temperature,
     required this.ambientTemperature,
     required this.ph,
-    required this.salinity,
+    this.salinity = 0.0,
     required this.tds,
     required this.dissolvedOxygen,
     required this.turbidity,
@@ -36,10 +38,12 @@ class TelemetryData {
     required this.batteryCurrent,
     required this.latitude,
     required this.longitude,
+    this.altitude = 0.0,
+    this.pumpStatus = 0,
     required this.timestamp,
   });
 
-  // Factory constructor untuk memetakan dari JSON serial / MQTT
+  // Factory constructor untuk memetakan dari JSON serial (ESP32) / MQTT
   factory TelemetryData.fromJson(Map<String, dynamic> json) {
     DateTime parsedTime;
     final rawTime = json['timestamp'];
@@ -51,34 +55,90 @@ class TelemetryData {
       parsedTime = DateTime.now();
     }
 
+    // Ekstrak nested map raw_values jika dikirim dari firmware baru ESP32
+    final rawValues = json['raw_values'] is Map<String, dynamic>
+        ? json['raw_values'] as Map<String, dynamic>
+        : (json['raw_values'] is Map ? Map<String, dynamic>.from(json['raw_values'] as Map) : null);
+
+    // Helper toleran untuk mengambil angka baik dari nested raw_values maupun root level
+    num? extractNum(String key, [List<String>? aliases]) {
+      if (rawValues != null && rawValues.containsKey(key)) {
+        final val = rawValues[key];
+        if (val is num) return val;
+        if (val is String) return num.tryParse(val);
+      }
+      if (json.containsKey(key)) {
+        final val = json[key];
+        if (val is num) return val;
+        if (val is String) return num.tryParse(val);
+      }
+      if (aliases != null) {
+        for (final alias in aliases) {
+          if (rawValues != null && rawValues.containsKey(alias)) {
+            final val = rawValues[alias];
+            if (val is num) return val;
+            if (val is String) return num.tryParse(val);
+          }
+          if (json.containsKey(alias)) {
+            final val = json[alias];
+            if (val is num) return val;
+            if (val is String) return num.tryParse(val);
+          }
+        }
+      }
+      return null;
+    }
+
     return TelemetryData(
-      serialNumber: json['serial_number'] ?? '',
-      cageCode: json['cage_code'] ?? '',
-      temperature: (json['water_temperature'] as num?)?.toDouble() ?? 
-                   (json['temperature'] as num?)?.toDouble() ?? 0.0,
-      ambientTemperature: (json['ambient_temperature'] as num?)?.toDouble() ?? 0.0,
-      ph: (json['ph'] as num?)?.toDouble() ?? 0.0,
-      salinity: (json['salinity'] as num?)?.toDouble() ?? 0.0,
-      tds: (json['tds'] as num?)?.toDouble() ?? 0.0,
-      dissolvedOxygen: (json['dissolved_oxygen'] as num?)?.toDouble() ?? 0.0,
-      turbidity: (json['turbidity'] as num?)?.toDouble() ?? 0.0,
-      flowSpeed: (json['flow_rate'] as num?)?.toDouble() ?? 
-                 (json['flow_speed'] as num?)?.toDouble() ?? 0.0,
-      solarVoltage: (json['solar_voltage'] as num?)?.toDouble() ?? 0.0,
-      solarCurrent: (json['solar_current'] as num?)?.toDouble() ?? 0.0,
-      batteryVoltage: (json['battery_voltage'] as num?)?.toDouble() ?? 0.0,
-      batteryCurrent: (json['battery_current'] as num?)?.toDouble() ?? 0.0,
-      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
-      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      serialNumber: (json['serial_number'] ?? json['serialNumber'] ?? '').toString(),
+      cageCode: (json['cage_code'] ?? json['cageCode'] ?? 'CAGE-A01').toString(),
+      temperature: (extractNum('temperature_node', ['water_temperature', 'temperature']))?.toDouble() ?? 0.0,
+      ambientTemperature: (extractNum('ambient_temperature', ['ambientTemperature']))?.toDouble() ?? 0.0,
+      ph: (extractNum('ph'))?.toDouble() ?? 0.0,
+      salinity: (extractNum('salinity'))?.toDouble() ?? 0.0,
+      tds: (extractNum('tds'))?.toDouble() ?? 0.0,
+      dissolvedOxygen: (extractNum('raw_dissolved_oxygen', ['dissolved_oxygen', 'dissolvedOxygen']))?.toDouble() ?? 0.0,
+      turbidity: (extractNum('turbidity'))?.toDouble() ?? 0.0,
+      flowSpeed: (extractNum('flow_rate', ['flow_speed', 'flowRate', 'flowSpeed']))?.toDouble() ?? 0.0,
+      solarVoltage: (extractNum('solar_voltage', ['solarVoltage']))?.toDouble() ?? 0.0,
+      solarCurrent: (extractNum('solar_current', ['solarCurrent']))?.toDouble() ?? 0.0,
+      batteryVoltage: (extractNum('battery_voltage', ['batteryVoltage']))?.toDouble() ?? 0.0,
+      batteryCurrent: (extractNum('battery_current', ['batteryCurrent']))?.toDouble() ?? 0.0,
+      latitude: (extractNum('latitude'))?.toDouble() ?? 0.0,
+      longitude: (extractNum('longitude'))?.toDouble() ?? 0.0,
+      altitude: (extractNum('altitude'))?.toDouble() ?? 0.0,
+      pumpStatus: (extractNum('pump_status', ['pumpStatus']))?.toInt() ?? 0,
       timestamp: parsedTime,
     );
   }
 
-  // Konversi objek ke map JSON untuk dipublikasikan via MQTT
+  // Konversi objek ke map JSON untuk dipublikasikan via MQTT ke Backend
   Map<String, dynamic> toJson() {
     return {
       'serial_number': serialNumber,
+      'timestamp': timestamp.millisecondsSinceEpoch ~/ 1000,
       'cage_code': cageCode,
+      'latitude': latitude,
+      'longitude': longitude,
+      'altitude': altitude,
+      'raw_values': {
+        'temperature_node': temperature,
+        'water_temperature': temperature,
+        'ambient_temperature': ambientTemperature,
+        'ph': ph,
+        'salinity': salinity,
+        'tds': tds,
+        'raw_dissolved_oxygen': dissolvedOxygen,
+        'dissolved_oxygen': dissolvedOxygen,
+        'turbidity': turbidity,
+        'flow_rate': flowSpeed,
+        'solar_voltage': solarVoltage,
+        'solar_current': solarCurrent,
+        'battery_voltage': batteryVoltage,
+        'battery_current': batteryCurrent,
+        'pump_status': pumpStatus,
+      },
+      // Flat fields for backward compatibility
       'water_temperature': temperature,
       'ambient_temperature': ambientTemperature,
       'ph': ph,
@@ -91,9 +151,7 @@ class TelemetryData {
       'solar_current': solarCurrent,
       'battery_voltage': batteryVoltage,
       'battery_current': batteryCurrent,
-      'latitude': latitude,
-      'longitude': longitude,
-      'timestamp': timestamp.toUtc().toIso8601String(),
+      'pump_status': pumpStatus,
     };
   }
 
@@ -116,6 +174,8 @@ class TelemetryData {
       'battery_current': batteryCurrent,
       'latitude': latitude,
       'longitude': longitude,
+      'altitude': altitude,
+      'pump_status': pumpStatus,
       'timestamp': timestamp.toIso8601String(),
     };
   }

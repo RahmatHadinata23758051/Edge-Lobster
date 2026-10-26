@@ -557,34 +557,70 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: s.isSerialConnected && _currentData != null ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Pompa status badge (aktuator dari firmware)
+                if (_currentData != null) ...[
                   Container(
-                    width: 5,
-                    height: 5,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.t3,
-                      shape: BoxShape.circle,
+                      color: _currentData!.pumpStatus == 1 ? const Color(0xFFE0F2FE) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.power_settings_new,
+                          size: 12,
+                          color: _currentData!.pumpStatus == 1 ? const Color(0xFF0284C7) : AppTheme.t3,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _currentData!.pumpStatus == 1 ? 'Pompa ON' : 'Pompa OFF',
+                          style: TextStyle(
+                            color: _currentData!.pumpStatus == 1 ? const Color(0xFF0369A1) : AppTheme.t3,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    s.isSerialConnected && _currentData != null ? '6 sensor aktif' : '0 sensor aktif',
-                    style: TextStyle(
-                      color: s.isSerialConnected && _currentData != null ? AppTheme.deepGreen : AppTheme.t3,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  const SizedBox(width: 8),
                 ],
-              ),
+                // Sensor status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: s.isSerialConnected && _currentData != null ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.t3,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        s.isSerialConnected && _currentData != null ? '6 sensor aktif' : '0 sensor aktif',
+                        style: TextStyle(
+                          color: s.isSerialConnected && _currentData != null ? AppTheme.deepGreen : AppTheme.t3,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
