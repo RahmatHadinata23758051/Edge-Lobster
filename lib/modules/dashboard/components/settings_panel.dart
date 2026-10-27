@@ -10,6 +10,8 @@ class SettingsPanel extends StatefulWidget {
   final VoidCallback onSaved;
   final VoidCallback onToggleSerial;
   final VoidCallback? onToggleMqtt;
+  final bool isMockRunning;
+  final VoidCallback? onToggleMock;
 
   const SettingsPanel({
     super.key,
@@ -17,6 +19,8 @@ class SettingsPanel extends StatefulWidget {
     required this.onSaved,
     required this.onToggleSerial,
     this.onToggleMqtt,
+    this.isMockRunning = false,
+    this.onToggleMock,
   });
 
   @override
@@ -172,7 +176,9 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         // Connection Toggles
                         _sectTitle(Icons.online_prediction, 'KONEKSI & STATUS AKTIF'),
                         const SizedBox(height: 12),
-                        Row(
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
                           children: [
                             _connectionButton(
                               icon: Icons.usb,
@@ -180,21 +186,24 @@ class _SettingsPanelState extends State<SettingsPanel> {
                               active: widget.state.isSerialConnected,
                               onPressed: widget.onToggleSerial,
                             ),
-                            const SizedBox(width: 12),
+                            _connectionButton(
+                              icon: Icons.science_outlined,
+                              label: widget.isMockRunning ? 'Simulasi: AKTIF' : 'Simulasi ESP32',
+                              active: widget.isMockRunning,
+                              onPressed: widget.onToggleMock ?? () {},
+                            ),
                             _connectionButton(
                               icon: Icons.cloud_sync,
                               label: 'MQTT Broker',
                               active: widget.state.isMqttConnected,
                               onPressed: widget.onToggleMqtt ?? widget.state.toggleMqtt,
                             ),
-                            const SizedBox(width: 12),
                             _connectionButton(
                               icon: Icons.language,
                               label: 'API Cloud Sync',
                               active: widget.state.isInternetConnected,
                               onPressed: widget.state.toggleInternet,
                             ),
-                            const SizedBox(width: 12),
                             ValueListenableBuilder<int>(
                               valueListenable: OfflineBufferService().pendingCountNotifier,
                               builder: (context, pendingCount, child) {

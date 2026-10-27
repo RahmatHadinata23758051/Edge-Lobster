@@ -37,6 +37,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   TelemetryData? _currentData;
   final List<ConsoleLog> _consoleLogs = [];
+  bool _isMockActive = false;
 
   // Sidebar Menu State
   int _selectedIndex = 0; // 0 = Dashboard, 1 = Settings
@@ -173,10 +174,92 @@ class _DashboardPageState extends State<DashboardPage> {
     _serialService.disconnect();
   }
 
+  void _startMock(GatewayStateProvider s) {
+    _stopSerial();
+    _stopMock();
+    _isMockActive = true;
+
+    _mockTelemetrySub = _mockService.telemetryStream.listen((d) {
+      _onTelemetryReceived(d, s);
+      if (mounted) {
+        final rawPacket = {
+          'serial_number': d.serialNumber,
+          'timestamp': d.timestamp.toIso8601String(),
+          'cage_code': d.cageCode,
+          'latitude': d.latitude,
+          'longitude': d.longitude,
+          'altitude': d.altitude,
+          'raw_values': {
+            'temperature_node': d.temperature,
+            'ambient_temperature': d.ambientTemperature,
+            'ph': d.ph,
+            'tds': d.tds,
+            'raw_dissolved_oxygen': d.dissolvedOxygen,
+            'turbidity': d.turbidity,
+            'flow_rate': d.flowSpeed,
+            'solar_voltage': d.solarVoltage,
+            'solar_current': d.solarCurrent,
+            'battery_voltage': d.batteryVoltage,
+            'battery_current': d.batteryCurrent,
+            'pump_status': d.pumpStatus,
+          }
+        };
+
+        final jsonString = jsonEncode(rawPacket);
+        setState(() {
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: d.serialNumber,
+            rawBytes: Uint8List.fromList(utf8.encode(jsonString)),
+            isValid: true,
+            details: 'SIMULASI HARDWARE ESP32 (UART STREAM)',
+          ));
+          if (_consoleLogs.length > 100) {
+            _consoleLogs.removeAt(0);
+          }
+        });
+      }
+    });
+
+    _mockService.startGenerating(s.activeNodeId);
+  }
+
   void _stopMock() {
+    _isMockActive = false;
     _mockTelemetrySub?.cancel();
     _mockTelemetrySub = null;
     _mockService.stopGenerating();
+  }
+
+  void _toggleMock(GatewayStateProvider s) {
+    if (_isMockActive) {
+      _stopMock();
+      if (mounted) {
+        setState(() {
+          _currentData = null;
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: 'SYSTEM',
+            rawBytes: Uint8List.fromList(utf8.encode('{"status":"SIMULASI HARDWARE DINONAKTIFKAN"}')),
+            isValid: true,
+            details: 'SIMULASI BERHENTI',
+          ));
+        });
+      }
+    } else {
+      _startMock(s);
+      if (mounted) {
+        setState(() {
+          _consoleLogs.add(ConsoleLog(
+            timestamp: DateTime.now(),
+            nodeId: 'SYSTEM',
+            rawBytes: Uint8List.fromList(utf8.encode('{"status":"SIMULASI HARDWARE ESP32 DIAKTIFKAN (5s INTERVAL)"}')),
+            isValid: true,
+            details: 'SIMULASI AKTIF',
+          ));
+        });
+      }
+    }
   }
 
   void _startMqtt(GatewayStateProvider s) {
@@ -396,15 +479,19 @@ class _DashboardPageState extends State<DashboardPage> {
                             width: 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.danger,
+                              color: _isMockActive
+                                  ? const Color(0xFF0284C7)
+                                  : (s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.danger),
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            s.isSerialConnected && _currentData != null ? 'Serial UART Terhubung' : 'Serial UART Terputus',
+                            _isMockActive
+                                ? 'Simulasi UART Aktif'
+                                : (s.isSerialConnected && _currentData != null ? 'Serial UART Terhubung' : 'Serial UART Terputus'),
                             style: TextStyle(
-                              color: s.isSerialConnected && _currentData != null ? AppTheme.t1 : AppTheme.t2,
+                              color: (_isMockActive || (s.isSerialConnected && _currentData != null)) ? AppTheme.t1 : AppTheme.t2,
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
@@ -458,6 +545,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   // Index 1: Settings view
                   SettingsPanel(
                     state: s,
+                    isMockRunning: _isMockActive,
+                    onToggleMock: () => _toggleMock(s),
                     onToggleSerial: () => _toggleSerial(s),
                     onToggleMqtt: () => _toggleMqtt(s),
                     onSaved: () {
@@ -466,7 +555,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       });
                       if (s.isSerialConnected) {
                         _startSerial(s);
-                      } else {
+                      } else if (!_isMockActive) {
                         _stopSerial();
                         _stopMock();
                         setState(() {
@@ -590,11 +679,47 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(width: 8),
                 ],
+                // Mode Simulasi ESP32 Button
+                InkWell(
+                  onTap: () => _toggleMock(s),
+                  borderRadius: BorderRadius.circular(20),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _isMockActive ? const Color(0xFFE0F2FE) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _isMockActive ? const Color(0xFF0284C7) : const Color(0xFFE5E7EB),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isMockActive ? Icons.science : Icons.science_outlined,
+                          size: 12,
+                          color: _isMockActive ? const Color(0xFF0284C7) : AppTheme.t2,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _isMockActive ? 'Simulasi: AKTIF' : 'Mode Simulasi ESP32',
+                          style: TextStyle(
+                            color: _isMockActive ? const Color(0xFF0369A1) : AppTheme.t1,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Sensor status badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: s.isSerialConnected && _currentData != null ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
+                    color: ((s.isSerialConnected || _isMockActive) && _currentData != null) ? const Color(0xFFE8F5E9) : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -604,15 +729,15 @@ class _DashboardPageState extends State<DashboardPage> {
                         width: 5,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: s.isSerialConnected && _currentData != null ? AppTheme.accentGreen : AppTheme.t3,
+                          color: ((s.isSerialConnected || _isMockActive) && _currentData != null) ? AppTheme.accentGreen : AppTheme.t3,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        s.isSerialConnected && _currentData != null ? '6 sensor aktif' : '0 sensor aktif',
+                        ((s.isSerialConnected || _isMockActive) && _currentData != null) ? '6 sensor aktif' : '0 sensor aktif',
                         style: TextStyle(
-                          color: s.isSerialConnected && _currentData != null ? AppTheme.deepGreen : AppTheme.t3,
+                          color: ((s.isSerialConnected || _isMockActive) && _currentData != null) ? AppTheme.deepGreen : AppTheme.t3,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
