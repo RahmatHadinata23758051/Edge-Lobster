@@ -9,7 +9,7 @@ import '../models/telemetry_data.dart';
 import 'mqtt_publisher_service.dart';
 
 /// Service buffer data offline menggunakan SQLite (sqflite_common_ffi)
-/// Menyimpan data sensor LoRa ke database lokal ketika internet/MQTT terputus,
+/// Menyimpan data sensor serial UART ke database lokal ketika internet/MQTT terputus,
 /// dan otomatis memicu Auto-Flush (FIFO) saat koneksi MQTT terhubung kembali.
 class OfflineBufferService {
   static final OfflineBufferService _instance = OfflineBufferService._internal();

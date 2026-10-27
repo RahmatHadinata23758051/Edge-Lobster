@@ -94,7 +94,7 @@ class _ConsolePanelState extends State<ConsolePanel> {
                 const SizedBox(width: 16),
                 // Tab title
                 const Text(
-                  'raw_data_lora.json',
+                  'raw_stream_uart.json',
                   style: TextStyle(
                     color: Color(0xFF8B949E),
                     fontSize: 10,

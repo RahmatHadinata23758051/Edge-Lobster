@@ -402,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            s.isSerialConnected && _currentData != null ? 'LoRa Terhubung' : 'LoRa Terputus',
+                            s.isSerialConnected && _currentData != null ? 'Serial UART Terhubung' : 'Serial UART Terputus',
                             style: TextStyle(
                               color: s.isSerialConnected && _currentData != null ? AppTheme.t1 : AppTheme.t2,
                               fontSize: 10,

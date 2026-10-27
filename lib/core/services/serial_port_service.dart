@@ -190,7 +190,7 @@ class SerialPortService {
         details: 'PARSED OK | CAGE: ${telemetry.cageCode}',
       );
     } catch (e) {
-      debugPrint('Gagal mem-parse data LoRa dari baris serial: $e');
+      debugPrint('Gagal mem-parse data Serial UART dari baris serial: $e');
       _emitConsoleLog(
         nodeId: 'UNKNOWN',
         rawBytes: bytes,

@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import '../models/telemetry_data.dart';
 
 class LoraParser {
-  /// Memetakan raw byte stream dari serial port LoRa receiver ke objek TelemetryData.
+  /// Memetakan raw byte stream dari serial port kabel UART mikrokontroler (ESP32) ke objek TelemetryData.
   /// Mendukung payload JSON string langsung maupun yang didahului oleh karakter preamble sampah/noise.
   static TelemetryData parse(Uint8List payload) {
     try {
@@ -25,7 +25,10 @@ class LoraParser {
       // 5. Instansiasi ke model TelemetryData
       return TelemetryData.fromJson(jsonMap);
     } catch (e) {
-      throw FormatException('Gagal memproses data LoRa: $e');
+      throw FormatException('Gagal memproses data Serial UART: $e');
     }
   }
 }
+
+/// Alias parser untuk migrasi dari LoRa ke Serial UART
+typedef SerialPayloadParser = LoraParser;
