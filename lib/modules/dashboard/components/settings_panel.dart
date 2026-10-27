@@ -369,24 +369,22 @@ class _SettingsPanelState extends State<SettingsPanel> {
     required bool active,
     required VoidCallback onPressed,
   }) {
-    return Expanded(
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 14, color: active ? Colors.white : AppTheme.t2),
-        label: Text(
-          active ? '$label (Aktif)' : '$label (Nonaktif)',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: active ? Colors.white : AppTheme.t2,
-          ),
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 14, color: active ? Colors.white : AppTheme.t2),
+      label: Text(
+        active ? '$label (Aktif)' : '$label (Nonaktif)',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: active ? Colors.white : AppTheme.t2,
         ),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: active ? AppTheme.primaryGreen : Colors.transparent,
-          side: BorderSide(color: active ? AppTheme.primaryGreen : AppTheme.border),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: active ? AppTheme.primaryGreen : Colors.transparent,
+        side: BorderSide(color: active ? AppTheme.primaryGreen : AppTheme.border),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
