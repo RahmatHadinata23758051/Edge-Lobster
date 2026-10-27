@@ -764,6 +764,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: TelemetryPanel(
                   data: _currentData,
                   isSerialConnected: s.isSerialConnected,
+                  isSimulated: _isMockActive,
                 ),
               ),
               const SizedBox(width: 12),

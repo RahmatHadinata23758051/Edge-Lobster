@@ -5,11 +5,13 @@ import '../../../../core/theme/app_theme.dart';
 class TelemetryPanel extends StatelessWidget {
   final TelemetryData? data;
   final bool isSerialConnected;
+  final bool isSimulated;
 
   const TelemetryPanel({
     super.key,
     this.data,
     this.isSerialConnected = true,
+    this.isSimulated = false,
   });
 
   String _formatTime(DateTime dt) {
@@ -21,13 +23,17 @@ class TelemetryPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOnline = isSerialConnected && data != null;
+    final bool isOnline = (isSerialConnected || isSimulated) && data != null;
 
-    final String statusText = !isSerialConnected
+    final String statusText = !isOnline
         ? 'Serial Nonaktif'
-        : (data != null ? 'Diperbarui ${_formatTime(data!.timestamp)}' : 'Menunggu Data Device');
+        : (isSimulated
+            ? 'Simulasi ${_formatTime(data!.timestamp)}'
+            : 'Diperbarui ${_formatTime(data!.timestamp)}');
 
-    final Color statusColor = isOnline ? AppTheme.ok : AppTheme.t3;
+    final Color statusColor = isOnline
+        ? (isSimulated ? const Color(0xFF0284C7) : AppTheme.ok)
+        : AppTheme.t3;
 
     return GridView.count(
       crossAxisCount: 3,
@@ -44,6 +50,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? 'mg/L' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
         _sensorCard(
@@ -53,6 +60,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? 'pH' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
         _sensorCard(
@@ -62,6 +70,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? 'ppm' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
         _sensorCard(
@@ -71,6 +80,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? '°C' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
         _sensorCard(
@@ -80,6 +90,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? 'NTU' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
         _sensorCard(
@@ -89,6 +100,7 @@ class TelemetryPanel extends StatelessWidget {
           unit: isOnline ? 'L/min' : '',
           statusText: statusText,
           isOnline: isOnline,
+          isSimulated: isSimulated,
           statusColor: statusColor,
         ),
       ],
@@ -102,6 +114,7 @@ class TelemetryPanel extends StatelessWidget {
     required String unit,
     required String statusText,
     required bool isOnline,
+    required bool isSimulated,
     required Color statusColor,
   }) {
     return Container(
@@ -201,15 +214,21 @@ class TelemetryPanel extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isOnline ? Icons.sensors : Icons.sensors_off,
+                    isOnline
+                        ? (isSimulated ? Icons.science_outlined : Icons.sensors)
+                        : Icons.sensors_off,
                     size: 10,
-                    color: isOnline ? AppTheme.accentGreen : AppTheme.t3,
+                    color: isOnline
+                        ? (isSimulated ? const Color(0xFF0284C7) : AppTheme.accentGreen)
+                        : AppTheme.t3,
                   ),
                   const SizedBox(width: 2),
                   Text(
-                    isOnline ? 'Real' : 'Offline',
+                    isOnline ? (isSimulated ? 'Simulasi' : 'Real') : 'Offline',
                     style: TextStyle(
-                      color: isOnline ? AppTheme.accentGreen : AppTheme.t3,
+                      color: isOnline
+                          ? (isSimulated ? const Color(0xFF0284C7) : AppTheme.accentGreen)
+                          : AppTheme.t3,
                       fontSize: 8,
                       fontWeight: FontWeight.w700,
                     ),
