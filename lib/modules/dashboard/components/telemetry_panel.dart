@@ -46,7 +46,7 @@ class TelemetryPanel extends StatelessWidget {
         _sensorCard(
           icon: Icons.water_drop_outlined,
           label: 'DISSOLVED OXYGEN',
-          value: isOnline ? data!.dissolvedOxygen.toStringAsFixed(1) : '—',
+          value: isOnline ? data!.dissolvedOxygen.toStringAsFixed(2) : '—',
           unit: isOnline ? 'mg/L' : '',
           statusText: statusText,
           isOnline: isOnline,
@@ -66,7 +66,7 @@ class TelemetryPanel extends StatelessWidget {
         _sensorCard(
           icon: Icons.grid_view_outlined,
           label: 'TOTAL DISSOLVED SOLIDS',
-          value: isOnline ? data!.tds.toStringAsFixed(0) : '—',
+          value: isOnline ? data!.tds.toStringAsFixed(2) : '—',
           unit: isOnline ? 'ppm' : '',
           statusText: statusText,
           isOnline: isOnline,
@@ -76,7 +76,7 @@ class TelemetryPanel extends StatelessWidget {
         _sensorCard(
           icon: Icons.thermostat_outlined,
           label: 'SUHU',
-          value: isOnline ? data!.temperature.toStringAsFixed(1) : '—',
+          value: isOnline ? data!.temperature.toStringAsFixed(2) : '—',
           unit: isOnline ? '°C' : '',
           statusText: statusText,
           isOnline: isOnline,
@@ -86,7 +86,7 @@ class TelemetryPanel extends StatelessWidget {
         _sensorCard(
           icon: Icons.opacity_outlined,
           label: 'TURBIDITY',
-          value: isOnline ? data!.turbidity.toStringAsFixed(1) : '—',
+          value: isOnline ? data!.turbidity.toStringAsFixed(2) : '—',
           unit: isOnline ? 'NTU' : '',
           statusText: statusText,
           isOnline: isOnline,
@@ -96,7 +96,7 @@ class TelemetryPanel extends StatelessWidget {
         _sensorCard(
           icon: Icons.waves_outlined,
           label: 'FLOW RATE',
-          value: isOnline ? data!.flowSpeed.toStringAsFixed(1) : '—',
+          value: isOnline ? data!.flowSpeed.toStringAsFixed(2) : '—',
           unit: isOnline ? 'L/min' : '',
           statusText: statusText,
           isOnline: isOnline,
