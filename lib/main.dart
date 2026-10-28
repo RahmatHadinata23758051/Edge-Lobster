@@ -7,8 +7,12 @@ import 'modules/dashboard/pages/dashboard_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Inisialisasi MediaKit untuk pemutar video RTSP native
-  MediaKit.ensureInitialized();
+  // Inisialisasi MediaKit untuk pemutar video RTSP native (non-fatal jika libmpv sistem belum terpasang)
+  try {
+    MediaKit.ensureInitialized();
+  } catch (e) {
+    debugPrint('MediaKit init warning (RTSP video disabled): $e');
+  }
   runApp(
     ChangeNotifierProvider(
       create: (_) => GatewayStateProvider(),

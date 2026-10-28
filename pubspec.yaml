@@ -46,6 +46,7 @@ dependencies:
   media_kit: ^1.1.10
   media_kit_video: ^1.1.10
   media_kit_libs_windows_video: any
+  media_kit_libs_linux: any
 
   # MQTT client
   mqtt_client: ^10.1.0
