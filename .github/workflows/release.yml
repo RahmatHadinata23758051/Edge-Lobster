@@ -29,7 +29,10 @@ jobs:
             liblzma-dev \
             libserialport-dev \
             libmpv-dev \
-            mpv
+            mpv \
+            libasound2-dev \
+            libpulse-dev \
+            libsqlite3-dev
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -62,7 +65,7 @@ jobs:
           #!/bin/bash
           echo "=== Menginstall dependensi runtime untuk LobSense Edge di Ubuntu 22.04 ==="
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libserialport0 libmpv2 mpv
+          sudo apt-get install -y libgtk-3-0 libserialport0 libmpv2 mpv libasound2 libsqlite3-0
           sudo usermod -aG dialout $USER
           echo "=== Selesai! Jika port serial baru dihubungkan, restart atau re-login sesi Ubuntu ==="
           echo "Jalankan: ./run.sh"
