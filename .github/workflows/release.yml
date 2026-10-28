@@ -56,6 +56,7 @@ jobs:
           DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
           cd "$DIR"
           export LD_LIBRARY_PATH="$DIR/lib:$LD_LIBRARY_PATH"
+          export LC_NUMERIC="C"
           ./lobsense_edge_app "$@"
           EOF
           chmod +x build/linux/x64/release/bundle/run.sh
