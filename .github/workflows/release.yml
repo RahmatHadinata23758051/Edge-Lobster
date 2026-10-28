@@ -75,6 +75,43 @@ jobs:
           EOF
           chmod +x build/linux/x64/release/bundle/setup-pipo-deps.sh
 
+          cat << 'EOF' > build/linux/x64/release/bundle/create-desktop-shortcut.sh
+          #!/bin/bash
+          DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          ICON_PATH="$DIR/data/flutter_assets/assets/icon.png"
+          if [ ! -f "$ICON_PATH" ]; then
+            ICON_PATH="$DIR/data/flutter_assets/assets/images/logo.png"
+          fi
+
+          DESKTOP_ENTRY="[Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=LobSense Edge
+          Comment=LobSense Edge Gateway & Telemetry Monitoring
+          Exec=$DIR/run.sh
+          Icon=$ICON_PATH
+          Terminal=false
+          StartupNotify=true
+          Categories=Utility;Science;"
+
+          # Pasang ke Menu Aplikasi Ubuntu (Show Applications)
+          mkdir -p "$HOME/.local/share/applications"
+          echo "$DESKTOP_ENTRY" > "$HOME/.local/share/applications/lobsense.desktop"
+          chmod +x "$HOME/.local/share/applications/lobsense.desktop"
+
+          # Pasang ke Layar Desktop jika ada folder Desktop
+          TARGET_DESKTOP="$HOME/Desktop"
+          if [ -d "$TARGET_DESKTOP" ]; then
+            echo "$DESKTOP_ENTRY" > "$TARGET_DESKTOP/lobsense.desktop"
+            chmod +x "$TARGET_DESKTOP/lobsense.desktop"
+            gio set "$TARGET_DESKTOP/lobsense.desktop" metadata::trusted true 2>/dev/null || true
+          fi
+
+          echo "=== Shortcut Desktop Berhasil Dibuat! ==="
+          echo "Icon 'LobSense Edge' sekarang sudah tersedia di Menu Aplikasi & Desktop Ubuntu."
+          EOF
+          chmod +x build/linux/x64/release/bundle/create-desktop-shortcut.sh
+
       - name: Package Linux Bundle (.tar.gz)
         run: |
           cd build/linux/x64/release
