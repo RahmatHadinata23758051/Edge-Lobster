@@ -1,0 +1,83 @@
+name: Release EdgeApp
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux x64 (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev \
+            libserialport-dev \
+            libmpv-dev \
+            mpv
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Linux Desktop
+        run: flutter config --enable-linux-desktop --no-analytics
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Linux Release Bundle
+        run: flutter build linux --release
+
+      - name: Add Helper Scripts
+        run: |
+          cat << 'EOF' > build/linux/x64/release/bundle/run.sh
+          #!/bin/bash
+          DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          cd "$DIR"
+          export LD_LIBRARY_PATH="$DIR/lib:$LD_LIBRARY_PATH"
+          ./lobsense_edge_app "$@"
+          EOF
+          chmod +x build/linux/x64/release/bundle/run.sh
+          chmod +x build/linux/x64/release/bundle/lobsense_edge_app
+
+          cat << 'EOF' > build/linux/x64/release/bundle/setup-pipo-deps.sh
+          #!/bin/bash
+          echo "=== Menginstall dependensi runtime untuk LobSense Edge di Ubuntu 22.04 ==="
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libserialport0 libmpv2 mpv
+          sudo usermod -aG dialout $USER
+          echo "=== Selesai! Jika port serial baru dihubungkan, restart atau re-login sesi Ubuntu ==="
+          echo "Jalankan: ./run.sh"
+          EOF
+          chmod +x build/linux/x64/release/bundle/setup-pipo-deps.sh
+
+      - name: Package Linux Bundle (.tar.gz)
+        run: |
+          cd build/linux/x64/release
+          tar -czvf ../../../../lobsense_edge_app-linux-x64.tar.gz bundle/
+
+      - name: Publish Linux Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: lobsense_edge_app-linux-x64.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
