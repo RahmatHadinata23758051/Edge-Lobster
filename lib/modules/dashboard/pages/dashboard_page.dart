@@ -113,6 +113,11 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) {
       setState(() => _currentData = d);
 
+      // Otomatis sinkronkan Node ID dari payload serial yang diterima tanpa perlu set manual
+      if (!_isMockActive && s.activeNodeId != d.serialNumber) {
+        s.setActiveNodeId(d.serialNumber);
+      }
+
       if (s.isMqttConnected && _mqttService.isConnected) {
         final ok = await _mqttService.publishTelemetry(d);
         if (!ok) {
@@ -641,7 +646,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Pemantauan kualitas air secara real-time - Node ${s.activeNodeId}',
+                  'Pemantauan kualitas air secara real-time - Node ${_currentData?.serialNumber ?? s.activeNodeId}',
                   style: const TextStyle(color: AppTheme.t3, fontSize: 11, fontWeight: FontWeight.w500),
                 ),
               ],

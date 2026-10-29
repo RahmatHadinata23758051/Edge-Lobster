@@ -110,6 +110,14 @@ class GatewayStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Update activeNodeId dynamically from serial payload without manual setting
+  void setActiveNodeId(String nodeId) {
+    if (_activeNodeId != nodeId && nodeId.isNotEmpty) {
+      _activeNodeId = nodeId;
+      notifyListeners();
+    }
+  }
+
   // Update Settings and persist to SharedPreferences
   Future<void> updateSettings({
     required String activePort,

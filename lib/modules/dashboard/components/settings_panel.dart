@@ -299,7 +299,16 @@ class _SettingsPanelState extends State<SettingsPanel> {
                         Row(
                           children: [
                             Expanded(
-                              child: _textField(label: 'Monitored Node ID', controller: _nodeController),
+                              child: _textField(
+                                label: widget.state.isSerialConnected
+                                    ? 'Node ID (Auto-detect dari Serial Port)'
+                                    : 'Node ID (Mode Simulasi)',
+                                controller: _nodeController,
+                                readOnly: widget.state.isSerialConnected,
+                                helperText: widget.state.isSerialConnected
+                                    ? 'Otomatis mengikuti serial_number dari payload ESP32'
+                                    : 'ID target untuk simulator dummy data internal',
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -446,6 +455,8 @@ class _SettingsPanelState extends State<SettingsPanel> {
     required String label,
     required TextEditingController controller,
     bool obscure = false,
+    bool readOnly = false,
+    String? helperText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,13 +466,16 @@ class _SettingsPanelState extends State<SettingsPanel> {
         TextField(
           controller: controller,
           obscureText: obscure,
-          style: const TextStyle(color: AppTheme.t1, fontSize: 12),
+          readOnly: readOnly,
+          style: TextStyle(color: readOnly ? AppTheme.t2 : AppTheme.t1, fontSize: 12),
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppTheme.bg,
+            fillColor: readOnly ? AppTheme.card : AppTheme.bg,
+            helperText: helperText,
+            helperStyle: const TextStyle(color: AppTheme.t3, fontSize: 10),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: AppTheme.border),
+              borderSide: BorderSide(color: readOnly ? AppTheme.border.withValues(alpha: 0.5) : AppTheme.border),
               borderRadius: BorderRadius.circular(8),
             ),
             focusedBorder: OutlineInputBorder(

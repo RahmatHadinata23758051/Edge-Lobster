@@ -55,6 +55,13 @@ class TelemetryData {
       parsedTime = DateTime.now();
     }
 
+    // Proteksi: Jika timestamp mikrokontroler (ESP32) melenceng > 10 menit dari jam aktual Gateway (PiPO), gunakan jam aktual Gateway
+    final now = DateTime.now();
+    if (parsedTime.isBefore(now.subtract(const Duration(minutes: 10))) ||
+        parsedTime.isAfter(now.add(const Duration(minutes: 5)))) {
+      parsedTime = now;
+    }
+
     // Ekstrak nested map raw_values jika dikirim dari firmware baru ESP32
     final rawValues = json['raw_values'] is Map<String, dynamic>
         ? json['raw_values'] as Map<String, dynamic>
